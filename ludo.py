@@ -12,10 +12,29 @@ Rules
  * A token can NOT enter home until its player has cut at least one opponent
    token. Until then it skips the home lane and keeps circling the board.
  * Exact number needed to reach the final home.
+
+File layout
+ 1. HTML        - the whole game client (HTML + CSS + JS, one string)
+ 2. Assets      - icons, manifest, service worker
+ 3. Room        - one online game: seats, ordered message log, live connections
+ 4. API         - create / join / leave / send
+ 5. HTTP + WS   - request handler, WebSocket + long-poll transport
+ 6. main()
 """
-import http.server, socketserver, threading, webbrowser, socket
-import json, random, queue, time, os, base64, hashlib, struct
-from urllib.parse import urlparse, parse_qs
+import base64
+import gzip
+import hashlib
+import http.server
+import json
+import os
+import queue
+import random
+import socket
+import struct
+import threading
+import time
+import webbrowser
+from urllib.parse import parse_qs, urlparse
 
 HTML = r"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -30,22 +49,23 @@ HTML = r"""<!DOCTYPE html>
 html,body{margin:0;height:100%;font-family:'Segoe UI',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:manipulation;overscroll-behavior:none}
 body{background:linear-gradient(135deg,#1b0b3a,#0b2a5b,#3a0b4f,#0b4a4a);background-size:400% 400%;animation:bg 18s ease infinite;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
 @keyframes bg{50%{background-position:100% 100%}}
-.blob{position:fixed;border-radius:50%;filter:blur(60px);opacity:.5;z-index:0;animation:fl 12s ease-in-out infinite alternate;pointer-events:none}
-.b1{width:320px;height:320px;background:#ff4d6d;top:-80px;left:-80px}
-.b2{width:300px;height:300px;background:#2de08a;bottom:-60px;right:-60px;animation-delay:-4s}
-.b3{width:260px;height:260px;background:#ffd23f;top:40%;right:-100px;animation-delay:-7s}
-.b4{width:280px;height:280px;background:#4dabff;bottom:10%;left:-100px;animation-delay:-2s}
+body:not(:has(#setup:not(.hide))){animation:none}
+.blob{position:fixed;border-radius:50%;opacity:.55;z-index:0;animation:fl 12s ease-in-out infinite alternate;pointer-events:none;will-change:transform}
+.b1{width:320px;height:320px;background:radial-gradient(circle,#ff4d6d 0,#ff4d6d00 70%);top:-80px;left:-80px}
+.b2{width:300px;height:300px;background:radial-gradient(circle,#2de08a 0,#2de08a00 70%);bottom:-60px;right:-60px;animation-delay:-4s}
+.b3{width:260px;height:260px;background:radial-gradient(circle,#ffd23f 0,#ffd23f00 70%);top:40%;right:-100px;animation-delay:-7s}
+.b4{width:280px;height:280px;background:radial-gradient(circle,#4dabff 0,#4dabff00 70%);bottom:10%;left:-100px;animation-delay:-2s}
 @keyframes fl{to{transform:translate(60px,-50px) scale(1.2)}}
 h1{margin:0;z-index:1;font-size:clamp(16px,3.2vw,26px);letter-spacing:3px;background:linear-gradient(90deg,#ff4d6d,#ffd23f,#2de08a,#4dabff);-webkit-background-clip:text;background-clip:text;color:transparent}
 .glass{background:rgba(255,255,255,.12);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.35);box-shadow:0 10px 40px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.5)}
-#board{--bs:min(98vw,calc(100vh - 212px),760px);--bs:min(98vw,calc(100dvh - 212px),760px);position:relative;width:var(--bs);height:var(--bs);border-radius:20px;z-index:1;overflow:hidden;touch-action:manipulation}
+#board{--bs:min(98vw,calc(100vh - 212px),760px);--bs:min(98vw,calc(100dvh - 212px),760px);position:relative;width:var(--bs);height:var(--bs);border-radius:20px;z-index:1;overflow:hidden;touch-action:manipulation;backdrop-filter:none;-webkit-backdrop-filter:none}
 #grid{position:absolute;inset:0;display:grid}
 .c{margin:.6px;border-radius:24%;background:linear-gradient(145deg,#fff,#e7ecff);border:1px solid #fff;box-shadow:0 1px 3px #0004,inset 0 -2px 4px #0000001a;display:flex;align-items:center;justify-content:center;font-size:calc(var(--bs)/24);color:#ff9d00;font-weight:700}
 .c.col{color:#fff;text-shadow:0 1px 3px #0006}
 .yard{margin:0;border-radius:16px;border:1px solid rgba(255,255,255,.6)}
 .yi{border-radius:16px;background:rgba(255,255,255,.35);box-shadow:inset 0 0 18px #fff9}
 #ctr{margin:0;border-radius:8px;background:conic-gradient(from -45deg,#2de08a 0 90deg,#ffd23f 90deg 180deg,#4dabff 180deg 270deg,#ff4d6d 270deg 360deg);box-shadow:inset 0 0 25px #fff8;border:1px solid #fff9}
-.tk{position:absolute;border-radius:50%;pointer-events:none;transform:translate(calc(-50% + var(--ox,0%)),calc(-50% + var(--oy,0%)));transition:left var(--tt,.07s) linear,top var(--tt,.07s) linear;z-index:5;border:2px solid #fff;box-shadow:0 4px 8px #0007,inset -3px -4px 8px #0006,inset 3px 3px 6px #fffa;will-change:left,top}
+.tk{position:absolute;border-radius:50%;pointer-events:none;transform:translate(calc(-50% + var(--ox,0%)),calc(-50% + var(--oy,0%)));transition:left var(--tt,.07s) linear,top var(--tt,.07s) linear;z-index:5;border:2px solid #fff;box-shadow:0 4px 8px #0007,inset -3px -4px 8px #0006,inset 3px 3px 6px #fffa}
 .tk::after{content:"";position:absolute;left:22%;top:14%;width:32%;height:22%;border-radius:50%;background:#fffc;filter:blur(1px)}
 .tk.can{z-index:9;animation:hop .5s ease-in-out infinite;box-shadow:0 0 0 3px #fff,0 0 18px 7px currentColor}
 @keyframes hop{50%{transform:translate(calc(-50% + var(--ox,0%)),calc(-80% + var(--oy,0%)))}}
@@ -505,9 +525,9 @@ $('#snd').onpointerdown=e=>{e.preventDefault();muted=!muted;$('#snd').textConten
 function toast(txt){const t=$('#toast');t.textContent=txt;t.classList.remove('show');void t.offsetWidth;t.classList.add('show')}
 function flash(col){const d=document.createElement('div');Object.assign(d.style,{position:'fixed',inset:0,zIndex:25,pointerEvents:'none',background:`radial-gradient(circle,${col}99,transparent 70%)`});
   document.body.appendChild(d);d.animate([{opacity:0},{opacity:1},{opacity:0}],{duration:700}).onfinish=()=>d.remove()}
-function burst(el,n=36,cols=Object.values(HEX)){const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+function burst(el,n=36,cols=Object.values(HEX)){n=Math.min(n,28);const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
   for(let i=0;i<n;i++){const p=document.createElement('div');
-    Object.assign(p.style,{position:'fixed',left:cx+'px',top:cy+'px',width:'10px',height:'10px',borderRadius:'50%',background:cols[i%cols.length],zIndex:40,pointerEvents:'none',boxShadow:'0 0 10px '+cols[i%cols.length]});
+    Object.assign(p.style,{position:'fixed',left:cx+'px',top:cy+'px',width:'10px',height:'10px',borderRadius:'50%',background:cols[i%cols.length],zIndex:40,pointerEvents:'none'});
     document.body.appendChild(p);const a=Math.random()*6.28,d=60+Math.random()*150;
     p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px) scale(0)`,opacity:0}],{duration:900+Math.random()*500}).onfinish=()=>p.remove()}}
 
@@ -750,11 +770,12 @@ function renderSeats(){const box=$('#seats');box.innerHTML='';COLORS.forEach(c=>
   const on=document.createElement('span');on.textContent=onlineOn.includes(c)?'🟢':'⚪';
   l.append(dot,nm);r.append(l,on);box.appendChild(r)})}
 async function until(f,ms=12000){const t=Date.now();while(!f()){if(Date.now()-t>ms)return false;await sleep(30)}return true}
+const SETTLED=()=>(phase==='roll'&&!busy)||phase==='move'||phase==='over'||phase==='idle';
 async function runQ(){qrun=true;
   while(MQ.length){BACKLOG=MQ.length;const m=MQ.shift();
-    if(m.t==='roll'){if(!await until(()=>phase==='roll'&&!busy))continue;if(m.c!==players[cur])continue;sentRoll=false;await rollDice(m.v)}
+    if(m.t==='roll'){if(!await until(SETTLED,40000)||phase!=='roll'||m.c!==players[cur])continue;sentRoll=false;await rollDice(m.v)}
     else if(m.t==='move'){if(m.c===me.color&&selfMoves>0){selfMoves--;sentMove=false;continue}
-      if(!await until(()=>phase==='move'))continue;const c=players[cur];if(m.c!==c)continue;sentMove=false;
+      if(!await until(SETTLED,40000)||phase!=='move')continue;const c=players[cur];if(m.c!==c)continue;sentMove=false;
       if(!(m.i>=0&&m.i<4)||stepsList(c,T[c][m.i],roll)===null)continue;await doMove(c,m.i)}
     else if(m.t==='skip'){if(await until(()=>phase==='roll'&&!busy))nextTurn()}
     else if(m.t==='left'){leftSet.add(m.c);const alive=players.filter(c=>!leftSet.has(c));
@@ -822,38 +843,154 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.
 """
 
 
+# ============================================================================
+# 2. ASSETS (icons are base64 PNGs)
+# ============================================================================
 ICON192 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAADlElEQVR42u3dPXITQRRFYWlKGyCmKLMBHJHDBvBOCL0EIjLYBhErIIdIRIQExCzBBEpE2WD9jKbf7f5OaE1Zre4z9/VUy8/ruzdvV/g31x+fmYT/MJkCEAgEAoFAIIBAIBAIBAIBBAKBQCAQCCAQCAQCgUAAgUAgEAgEAoEAAoFAIBAIBBAIBAKBQCCAQCAQCAQCAQQCgUAgpLNJGuznD8u/57bRZ73++T5iTdbV2/y2kKYalWUqLBB1EjQqKRB1cjSa2JPF9uqWQOzpx6EyJYw6meVsYo8o6msPhCgKCCR+kkNoYg+HYgViT75D9kAIFUj8dBFCEgiJAomfXkJIAoFAaMcm/QM8ffLy/g9//f5mtMvQ4jB1pg3Qg4tRdmEWG+3CJ6ypJezR9TjwGqMdroQdNdG7ixtGUdZobaJBoAvkfKvqkDXa/gU6Z2aXX5Ws0SphINCFb8olb+us0UogEAgEAoEAAoFAINDMnH9CtOQZU9ZoJRAIdOGbcvkbOmu0oyTQaTPbaj2yRquEoQF5Xyjb3aAHHhU1v5uzRjtQAh0y13XWI2u0nSfQITd3wcXIGu0QAiXOfrQrNtEgEAgEAgEEgqewy9Hf8zaBWqqz/xKNlLBT7DnqGglEnccvFkUSCARaPH7UMgLN5gGHCAQCNYofIUQgEAhN2azebc1CTzz/uug/PJBAIBAIBAJFMk4XBAKBQN2FkAN5Ap3uAXsIhHPxhbK/4qTjLggSqEotY48EOjGKqEMgG2QlDAQCgQACgUDwFHYWWc/beiRWX4z9l0otTK89G6b+7DnqGqMdLoGyuiB037PBJhojCZTVBWGEng1T9/a0WpVBejYoYRhDoKwuCOP0bJBAIBAIBAKBQACBQKAHyOqCME7PBgmEYQTK6oIwSM+GsATK6oIwQs8GJQxnkfeFsqwuCN33bEhNoKwuCB33bFjfbV81eNsXX+b6Tf4qY5+bT0pY11vO/no22ESDQBhOoO+vTf3sLL8BkkDIFUgI5cePBEK0QEIoPH4KJBCHku2pUcI4FGuPPRD6EEgIZcbPqtBZ2M6h+Q5ZqTNkCRNFUfaU3ANxKMeeVdGvcyhnCeoUFohGCeqUF+h+RRtJpsrSRAnUent080MEZm2iQSAQCCAQCAQCgUAAgUAgEAgEAggEAoFAIBAIBBAIBAKBQCCAQCAQCAQCAQQCgUAgEAggEAgEAoFAAIFAIBAIBMKI/AEzQkJZyJ8zLQAAAABJRU5ErkJggg==")
 ICON512 = base64.b64decode("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")
-MANIFEST = json.dumps({"name": "Glass Ludo", "short_name": "Glass Ludo", "start_url": "/", "scope": "/",
-    "display": "standalone", "orientation": "portrait", "background_color": "#1b0b3a", "theme_color": "#1b0b3a",
+
+
+MANIFEST = json.dumps({
+    "name": "Glass Ludo", "short_name": "Glass Ludo", "start_url": "/", "scope": "/",
+    "display": "standalone", "orientation": "portrait",
+    "background_color": "#1b0b3a", "theme_color": "#1b0b3a",
     "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
               {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]})
+
+# Network-first cache for the page itself. API calls, the WebSocket and /health are never cached
+# (caching /health made the "offline" indicator lie).
 SW = ("self.addEventListener('install',e=>self.skipWaiting());"
       "self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));"
       "self.addEventListener('fetch',e=>{const u=new URL(e.request.url);"
-      "if(e.request.method!=='GET'||u.pathname.startsWith('/api/')||u.origin!==location.origin)return;"
+      "if(e.request.method!=='GET'||u.origin!==location.origin||u.pathname.startsWith('/api/')"
+      "||u.pathname==='/health'||u.pathname==='/ws')return;"
       "e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open('gl').then(k=>k.put(e.request,c));return r})"
       ".catch(()=>caches.match(e.request)))});")
 
+STATIC = {"/manifest.json": (MANIFEST, "application/manifest+json"),
+          "/sw.js": (SW, "application/javascript"),
+          "/icon-192.png": (ICON192, "image/png"),
+          "/icon-512.png": (ICON512, "image/png"),
+          "/health": ("ok", "text/plain")}
+
+HTML_BYTES = HTML.encode("utf-8")
+HTML_GZ = gzip.compress(HTML_BYTES, 9)      # compressed once at start-up, not per request
+
+
+# ============================================================================
+# 3. ROOM  (one online game)
+# ============================================================================
 COLORS = ["red", "green", "yellow", "blue"]
+OPPOSITE = {"red": "yellow", "yellow": "red", "green": "blue", "blue": "green"}
 CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-ROOMS = {}
-ROOMS_LOCK = threading.Lock()
+ROOM_TTL = 6 * 3600                 # idle rooms are dropped after 6 hours
+MAX_ROOMS = 500
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 ROOMS_FILE = os.environ.get("ROOMS_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "ludo_rooms.json"))
+
+RNG = random.SystemRandom()         # the server rolls the dice, so nobody can cheat
+ROOMS = {}
+ROOMS_LOCK = threading.Lock()       # guards the ROOMS dict only; never held while a Room lock is taken
 _save_pending = False
 
 
+class Room:
+    """Server picks dice values and relays every action to all players, in order.
+
+    `log` is the single source of truth: a reconnecting client just replays it.
+    All mutable state is protected by `lock` (re-entrant); `cond` wakes long-pollers.
+    """
+
+    def __init__(self, code):
+        self.code = code
+        self.seats = {}             # colour -> client id
+        self.names = {}             # client id -> display name
+        self.host = None            # client id of the host
+        self.started = False
+        self.log = []               # ordered game messages
+        self.conns = {}             # client id -> [Queue, ...] (open WebSockets)
+        self.left = set()           # colours that quit mid-game
+        self.seen = {}              # client id -> last long-poll time
+        self.touch = time.time()
+        self.lock = threading.RLock()
+        self.cond = threading.Condition(self.lock)
+
+    # ---- seats ----
+    def color_of(self, cid):
+        return next((c for c, i in self.seats.items() if i == cid), None)
+
+    def lobby(self):
+        return {"t": "lobby", "host": self.color_of(self.host),
+                "seats": {c: self.names[i] for c, i in self.seats.items()}}
+
+    def free_corner(self):
+        """Prefer the corner opposite an existing player (2 players = diagonal), else the first free one."""
+        for c in self.seats:
+            if OPPOSITE[c] not in self.seats:
+                return OPPOSITE[c]
+        return next((c for c in COLORS if c not in self.seats), None)
+
+    # ---- messaging ----
+    def _fanout(self, msg):
+        for queues in self.conns.values():
+            for q in queues:
+                q.put(msg)
+
+    def append(self, msg):
+        """Add a message to the log and push it to everyone."""
+        with self.lock:
+            msg["n"] = len(self.log) + 1
+            self.log.append(msg)
+            self.touch = time.time()
+            self.cond.notify_all()
+            self._fanout(msg)
+        schedule_save()
+
+    def transient(self, msg):
+        """Push a message that is not stored in the log (e.g. presence)."""
+        with self.lock:
+            self._fanout(msg)
+
+    def online_colors(self):
+        now = time.time()
+        with self.lock:
+            return [c for c, i in self.seats.items() if i in self.conns or now - self.seen.get(i, 0) < 35]
+
+    def presence(self):
+        self.transient({"t": "presence", "on": self.online_colors()})
+
+    # ---- WebSocket connections ----
+    def attach(self, cid, after):
+        """Register a live connection; returns its queue, pre-filled with everything after `after`."""
+        q = queue.Queue()
+        with self.lock:
+            for m in self.log[after:]:
+                q.put(m)
+            q.put({"t": "synced"})
+            self.conns.setdefault(cid, []).append(q)
+            self.seen[cid] = time.time()
+        return q
+
+    def detach(self, cid, q):
+        with self.lock:
+            qs = self.conns.get(cid, [])
+            if q in qs:
+                qs.remove(q)
+            if not qs:
+                self.conns.pop(cid, None)
+
+
+# ---- persistence (games survive a server restart where the disk is kept) ----
 def schedule_save():
-    """Save rooms to disk shortly after a change, so games survive a server restart (where the disk is kept)."""
+    """Coalesce writes: at most one disk save every 1.5 s."""
     global _save_pending
     if _save_pending:
         return
     _save_pending = True
-    threading.Timer(1.5, do_save).start()
+    threading.Timer(1.5, _do_save).start()
 
 
-def do_save():
+def _do_save():
     global _save_pending
     _save_pending = False
     try:
@@ -862,8 +999,8 @@ def do_save():
         data = {}
         for code, r in items:
             with r.lock:
-                data[code] = {"seats": dict(r.seats), "names": dict(r.names), "host": r.host,
-                              "started": r.started, "log": list(r.log), "touch": r.touch, "left": list(r.left)}
+                data[code] = {"seats": dict(r.seats), "names": dict(r.names), "host": r.host, "started": r.started,
+                              "log": list(r.log), "touch": r.touch, "left": list(r.left)}
         tmp = ROOMS_FILE + ".tmp"
         with open(tmp, "w") as f:
             json.dump(data, f)
@@ -880,103 +1017,44 @@ def load_rooms():
         return
     now = time.time()
     for code, d in data.items():
-        if now - d.get("touch", 0) > 6 * 3600:
+        if now - d.get("touch", 0) > ROOM_TTL:
             continue
         r = Room(code)
         r.seats, r.names, r.host = d["seats"], d["names"], d["host"]
         r.started, r.log, r.touch = d["started"], d["log"], now
         r.left = set(d.get("left", []))
         ROOMS[code] = r
-RNG = random.SystemRandom()
 
 
-class Room:
-    """One online game. Server picks dice values and relays every action to all players in order."""
-    def __init__(self, code):
-        self.code = code
-        self.seats = {}      # colour -> client id
-        self.names = {}      # client id -> display name
-        self.host = None     # client id of host
-        self.started = False
-        self.log = []        # ordered game messages (lets players reconnect / catch up)
-        self.conns = {}      # client id -> [Queue,...] (open event streams)
-        self.lock = threading.RLock()
-        self.cond = threading.Condition(self.lock)
-        self.left = set()    # colours of players who quit mid-game
-        self.seen = {}       # client id -> last time it polled
-        self.touch = time.time()
-
-    def color_of(self, cid):
-        for c, i in self.seats.items():
-            if i == cid:
-                return c
-        return None
-
-    def append(self, msg):
-        with self.lock:
-            msg["n"] = len(self.log) + 1
-            self.log.append(msg)
-            self.cond.notify_all()
-            schedule_save()
-            for qs in self.conns.values():
-                for q in qs:
-                    q.put((msg["n"], msg))
-            self.touch = time.time()
-
-    def transient(self, msg):
-        with self.lock:
-            for qs in self.conns.values():
-                for q in qs:
-                    q.put((None, msg))
-
-    def online_colors(self):
-        now = time.time()
-        return [c for c, i in self.seats.items() if i in self.conns or now - self.seen.get(i, 0) < 35]
-
-    def lobby(self):
-        return {"t": "lobby", "seats": {c: self.names[i] for c, i in self.seats.items()},
-                "host": self.color_of(self.host)}
-
-    def presence(self):
-        with self.lock:
-            on = self.online_colors()
-        self.transient({"t": "presence", "on": on})
-
-
+# ============================================================================
+# 4. API  (every function takes the decoded JSON body and returns a dict)
+# ============================================================================
 def clean_name(n):
-    n = " ".join(str(n or "").split())[:14]
-    return n or "Player"
+    return " ".join(str(n or "").split())[:14] or "Player"
 
 
 def new_id():
     return os.urandom(8).hex()
 
 
-OPP = {"red": "yellow", "yellow": "red", "green": "blue", "blue": "green"}
+def new_code():
+    return "".join(RNG.choice(CODE_CHARS) for _ in range(4))
 
 
-def pick_free(r):
-    """Prefer the corner opposite an existing player (2 players = diagonal), else first free corner."""
-    for c in list(r.seats):
-        if OPP[c] not in r.seats:
-            return OPP[c]
-    for c in COLORS:
-        if c not in r.seats:
-            return c
+def find_room(code):
+    return ROOMS.get(str(code or "").strip().upper())
 
 
 def api_create(d):
     with ROOMS_LOCK:
-        for k in [k for k, r in ROOMS.items() if time.time() - r.touch > 6 * 3600]:
+        for k in [k for k, r in ROOMS.items() if time.time() - r.touch > ROOM_TTL]:
             del ROOMS[k]
-        if len(ROOMS) > 500:
+        if len(ROOMS) > MAX_ROOMS:
             return {"error": "Server is busy, try later"}
-        while True:
-            code = "".join(RNG.choice(CODE_CHARS) for _ in range(4))
-            if code not in ROOMS:
-                break
-        r = Room(code)
-        ROOMS[code] = r
+        code = new_code()
+        while code in ROOMS:
+            code = new_code()
+        r = ROOMS[code] = Room(code)
     cid = new_id()
     with r.lock:
         r.seats["red"] = cid
@@ -988,103 +1066,140 @@ def api_create(d):
 
 
 def api_join(d):
-    code = str(d.get("room", "")).strip().upper()
-    r = ROOMS.get(code)
+    r = find_room(d.get("room"))
     if not r:
         return {"error": "Room not found - check the code"}
     cid = str(d.get("id") or "")
     with r.lock:
-        if cid and cid in r.names:                       # re-join after refresh / reconnect
-            if r.color_of(cid) in r.left:
+        if cid and cid in r.names:                        # re-join after refresh / reconnect
+            col = r.color_of(cid)
+            if col in r.left:
                 return {"error": "You left this game"}
-            return {"id": cid, "color": r.color_of(cid), "room": code}
+            return {"id": cid, "color": col, "room": r.code}
         if r.started:
             return {"error": "That game has already started"}
-        free = [c for c in COLORS if c not in r.seats]
-        if not free:
+        col = r.free_corner()
+        if col is None:
             return {"error": "Room is full (4 players)"}
         cid = new_id()
-        col = pick_free(r)
         r.seats[col] = cid
         r.names[cid] = clean_name(d.get("name"))
         r.append(r.lobby())
-    return {"id": cid, "color": col, "room": code}
+    return {"id": cid, "color": col, "room": r.code}
 
 
 def api_leave(d):
     """Close this device's session. Before the game starts the seat is freed (host leaving closes the room)."""
-    code = str(d.get("room", "")).strip().upper()
-    r = ROOMS.get(code)
+    r = find_room(d.get("room"))
     cid = str(d.get("id") or "")
     if not r or cid not in r.names:
         return {"ok": True}
+    close_room = False
     with r.lock:
+        col = r.color_of(cid)
         if not r.started:
             if cid == r.host:
                 r.append({"t": "closed"})
-                with ROOMS_LOCK:
-                    ROOMS.pop(code, None)
-                schedule_save()
+                close_room = True
             else:
-                col = r.color_of(cid)
                 if col:
                     del r.seats[col]
                 del r.names[cid]
+                r.seen.pop(cid, None)
                 r.append(r.lobby())
-        else:                                   # game running: everyone is told this player left
-            col = r.color_of(cid)
-            if col and col not in r.left:
-                r.left.add(col)
-                if cid == r.host:               # hand "host" to someone still playing
-                    for c, i in r.seats.items():
-                        if c not in r.left:
-                            r.host = i
-                            break
-                    r.append(r.lobby())
-                r.append({"t": "left", "c": col})
+        elif col and col not in r.left:                   # game running: tell everyone this player left
+            r.left.add(col)
+            if cid == r.host:                             # hand "host" to someone still playing
+                r.host = next((i for c, i in r.seats.items() if c not in r.left), r.host)
+                r.append(r.lobby())
+            r.append({"t": "left", "c": col})
+    if close_room:                                        # taken after the room lock is released (no nested locks)
+        with ROOMS_LOCK:
+            ROOMS.pop(r.code, None)
+        schedule_save()
     return {"ok": True}
 
 
 def api_send(d):
-    r = ROOMS.get(str(d.get("room", "")).upper())
+    r = find_room(d.get("room"))
     cid = str(d.get("id", ""))
-    msg = d.get("msg") or {}
+    msg = d.get("msg")
     if not r or r.color_of(cid) is None:
         return {"error": "not in room"}
-    color, t = r.color_of(cid), msg.get("t")
+    if not isinstance(msg, dict):
+        return {"ok": True}
+    t = msg.get("t")
     with r.lock:
+        color = r.color_of(cid)
+        if t == "seat" and not r.started:
+            new = msg.get("color")
+            if new in COLORS and new != color:
+                if new in r.seats:
+                    return {"error": "That corner is taken"}
+                del r.seats[color]
+                r.seats[new] = cid
+                r.append(r.lobby())
+                return {"ok": True, "color": new}
+            return {"ok": True, "color": color}
         if t == "start":
             if cid == r.host and not r.started and len(r.seats) >= 2:
                 r.started = True
                 w = msg.get("win")
-                w = w if isinstance(w, int) and 1 <= w <= 4 else 4
-                r.append({"t": "start", "win": w, "players": [c for c in COLORS if c in r.seats]})
-        elif t == "seat" and not r.started:
-            c = msg.get("color")
-            if c in COLORS and c != color:
-                if c in r.seats:
-                    return {"error": "That corner is taken"}
-                del r.seats[color]
-                r.seats[c] = cid
-                r.append(r.lobby())
-                return {"ok": True, "color": c}
-            return {"ok": True, "color": color}
-        elif r.started and t == "roll":
+                r.append({"t": "start", "win": w if isinstance(w, int) and 1 <= w <= 4 else 4,
+                          "players": [c for c in COLORS if c in r.seats]})
+        elif not r.started:
+            pass
+        elif t == "roll":
             r.append({"t": "roll", "c": color, "v": RNG.randint(1, 6)})
-        elif r.started and t == "move":
+        elif t == "move":
             i = msg.get("i")
             if isinstance(i, int) and 0 <= i < 4:
                 r.append({"t": "move", "c": color, "i": i})
-        elif r.started and t == "skip" and cid == r.host:
-            r.append({"t": "skip"})
-        elif r.started and t == "finish" and cid == r.host:
-            r.append({"t": "finish"})
+        elif t in ("skip", "finish") and cid == r.host:
+            r.append({"t": t})
     return {"ok": True}
 
 
-class H(http.server.BaseHTTPRequestHandler):
+# ============================================================================
+# 5. HTTP + WEBSOCKET
+# ============================================================================
+def _arg(q, key, default=""):
+    return q.get(key, [default])[0]
+
+
+def _after(q):
+    try:
+        return max(0, int(_arg(q, "after", "0")))
+    except ValueError:
+        return 0
+
+
+def ws_frame(op, payload=b""):
+    """Build one unmasked server->client WebSocket frame."""
+    if isinstance(payload, str):
+        payload = payload.encode("utf-8")
+    n = len(payload)
+    if n < 126:
+        head = bytes([0x80 | op, n])
+    elif n < 65536:
+        head = bytes([0x80 | op, 126]) + struct.pack(">H", n)
+    else:
+        head = bytes([0x80 | op, 127]) + struct.pack(">Q", n)
+    return head + payload
+
+
+def ws_unmask(payload, mask):
+    """XOR payload with the 4-byte mask (done as one big-int XOR instead of a Python loop per byte)."""
+    n = len(payload)
+    if not n:
+        return payload
+    key = (mask * (n // 4 + 1))[:n]
+    return (int.from_bytes(payload, "big") ^ int.from_bytes(key, "big")).to_bytes(n, "big")
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "GlassLudo"
-    protocol_version = "HTTP/1.1"      # keep-alive: faster repeated requests
+    protocol_version = "HTTP/1.1"       # keep-alive: faster repeated requests
     timeout = 70
 
     def setup(self):
@@ -1094,16 +1209,29 @@ class H(http.server.BaseHTTPRequestHandler):
         except OSError:
             pass
 
-    def _send(self, code, body, ctype="application/json"):
+    def log_message(self, *a):
+        pass
+
+    # ---- responses ----
+    def _send(self, code, body, ctype="application/json", extra=None):
         b = body if isinstance(body, bytes) else body.encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(b)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("Access-Control-Allow-Origin", "*")
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(b)
 
+    def _page(self):
+        if "gzip" in self.headers.get("Accept-Encoding", ""):
+            return self._send(200, HTML_GZ, "text/html; charset=utf-8",
+                              {"Content-Encoding": "gzip", "Vary": "Accept-Encoding"})
+        self._send(200, HTML_BYTES, "text/html; charset=utf-8", {"Vary": "Accept-Encoding"})
+
+    # ---- routing ----
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -1114,170 +1242,36 @@ class H(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         u = urlparse(self.path)
-        p = u.path
+        p, q = u.path, parse_qs(u.query)
         if p in ("/", "/index.html"):
-            return self._send(200, HTML, "text/html; charset=utf-8")
-        if p == "/manifest.json":
-            return self._send(200, MANIFEST, "application/manifest+json")
-        if p == "/sw.js":
-            return self._send(200, SW, "application/javascript")
-        if p == "/icon-192.png":
-            return self._send(200, ICON192, "image/png")
-        if p == "/icon-512.png":
-            return self._send(200, ICON512, "image/png")
-        if p == "/health":
-            return self._send(200, "ok", "text/plain")
+            return self._page()
+        if p in STATIC:
+            return self._send(200, *STATIC[p])
         if p == "/ws":
-            return self.ws(parse_qs(u.query))
+            return self.ws(q)
         if p == "/api/poll":
-            return self.poll(parse_qs(u.query))
-        if p == "/api/events":
-            return self.events(parse_qs(u.query))
+            return self.poll(q)
         self._send(404, "not found", "text/plain")
 
     def do_POST(self):
+        routes = {"/api/create": api_create, "/api/join": api_join, "/api/send": api_send, "/api/leave": api_leave}
         try:
             n = int(self.headers.get("Content-Length") or 0)
             data = json.loads(self.rfile.read(min(n, 20000)) or b"{}")
         except Exception:
             return self._send(400, '{"error":"bad request"}')
-        fn = {"/api/create": api_create, "/api/join": api_join, "/api/send": api_send, "/api/leave": api_leave}.get(urlparse(self.path).path.rstrip("/"))
+        fn = routes.get(urlparse(self.path).path.rstrip("/"))
         if not fn:
             return self._send(404, '{"error":"not found"}')
         self._send(200, json.dumps(fn(data)))
 
-    def ws_read(self):
-        """Read one WebSocket message (text/control frame) from the client."""
-        f = self.rfile
-
-        def need(n):
-            b = f.read(n)
-            if b is None or len(b) < n:
-                raise OSError("closed")
-            return b
-        data, op0 = b"", None
-        while True:
-            b1, b2 = need(2)
-            fin, op, masked, n = b1 & 0x80, b1 & 0x0F, b2 & 0x80, b2 & 0x7F
-            if n == 126:
-                n = struct.unpack(">H", need(2))[0]
-            elif n == 127:
-                n = struct.unpack(">Q", need(8))[0]
-            if n > 65536:
-                raise ValueError("frame too big")
-            mask = need(4) if masked else b""
-            payload = need(n)
-            if masked:
-                payload = bytes(c ^ mask[i % 4] for i, c in enumerate(payload))
-            if op >= 8:
-                return op, payload
-            if op0 is None:
-                op0 = op
-            data += payload
-            if fin:
-                return op0, data
-
-    def ws(self, q):
-        """WebSocket: one always-open connection, messages pushed instantly both ways."""
-        r = ROOMS.get(q.get("room", [""])[0].upper())
-        cid = q.get("id", [""])[0]
-        key = self.headers.get("Sec-WebSocket-Key")
-        if not r or cid not in r.names or not key:
-            return self._send(404, '{"error":"unknown room"}')
-        try:
-            after = max(0, int(q.get("after", ["0"])[0]))
-        except ValueError:
-            after = 0
-        accept = base64.b64encode(hashlib.sha1((key + WS_GUID).encode()).digest()).decode()
-        self.send_response(101)
-        self.send_header("Upgrade", "websocket")
-        self.send_header("Connection", "Upgrade")
-        self.send_header("Sec-WebSocket-Accept", accept)
-        self.end_headers()
-        self.close_connection = True
-        sock = self.connection
-        sock.settimeout(75)
-        slock, qu, alive = threading.Lock(), queue.Queue(), threading.Event()
-        alive.set()
-
-        def send(op, payload=b""):
-            if isinstance(payload, str):
-                payload = payload.encode("utf-8")
-            n = len(payload)
-            head = bytes([0x80 | op])
-            if n < 126:
-                head += bytes([n])
-            elif n < 65536:
-                head += bytes([126]) + struct.pack(">H", n)
-            else:
-                head += bytes([127]) + struct.pack(">Q", n)
-            with slock:
-                sock.sendall(head + payload)
-
-        with r.lock:
-            for m in r.log[after:]:
-                qu.put((m["n"], m))
-            qu.put((None, {"t": "synced"}))
-            r.conns.setdefault(cid, []).append(qu)
-            r.seen[cid] = time.time()
-        r.presence()
-
-        def writer():
-            try:
-                while alive.is_set():
-                    try:
-                        item = qu.get(timeout=20)
-                    except queue.Empty:
-                        send(9)                    # keep-alive ping
-                        continue
-                    if item is None:
-                        break
-                    send(1, json.dumps(item[1]))
-            except OSError:
-                pass
-            finally:
-                alive.clear()
-        threading.Thread(target=writer, daemon=True).start()
-        try:
-            while alive.is_set():
-                op, payload = self.ws_read()
-                if op == 8:
-                    break
-                if op == 9:
-                    send(10, payload)
-                elif op == 1:
-                    try:
-                        msg = json.loads(payload.decode("utf-8"))
-                    except Exception:
-                        continue
-                    if isinstance(msg, dict):
-                        api_send({"room": r.code, "id": cid, "msg": msg})
-        except (OSError, ValueError):
-            pass
-        finally:
-            alive.clear()
-            qu.put(None)
-            with r.lock:
-                if cid in r.conns and qu in r.conns[cid]:
-                    r.conns[cid].remove(qu)
-                    if not r.conns[cid]:
-                        del r.conns[cid]
-            r.presence()
-            try:
-                send(8)
-            except OSError:
-                pass
-
+    # ---- long-poll transport (fallback when WebSockets are blocked) ----
     def poll(self, q):
-        """Long-poll: wait (up to 20s) until there is a new message, then answer immediately."""
-        r = ROOMS.get(q.get("room", [""])[0].upper())
-        cid = q.get("id", [""])[0]
+        """Wait (up to 20 s) until there is a new message, then answer immediately."""
+        r, cid = find_room(_arg(q, "room")), _arg(q, "id")
         if not r or cid not in r.names:
             return self._send(200, '{"error":"unknown room"}')
-        try:
-            after = max(0, int(q.get("after", ["0"])[0]))
-        except ValueError:
-            after = 0
+        after = _after(q)
         deadline = time.time() + 20
         with r.cond:
             r.seen[cid] = time.time()
@@ -1291,53 +1285,106 @@ class H(http.server.BaseHTTPRequestHandler):
             more = len(r.log) > after + 300
         self._send(200, json.dumps({"msgs": msgs, "more": more, "on": r.online_colors()}))
 
-    def events(self, q):
-        r = ROOMS.get(q.get("room", [""])[0].upper())
-        cid = q.get("id", [""])[0]
-        if not r or cid not in r.names:
+    # ---- WebSocket transport ----
+    def ws_read(self):
+        """Read one complete WebSocket message (or control frame) from the client."""
+        f = self.rfile
+
+        def need(n):
+            b = f.read(n)
+            if b is None or len(b) < n:
+                raise OSError("closed")
+            return b
+
+        data, first_op = b"", None
+        while True:
+            b1, b2 = need(2)
+            fin, op, masked, n = b1 & 0x80, b1 & 0x0F, b2 & 0x80, b2 & 0x7F
+            if n == 126:
+                n = struct.unpack(">H", need(2))[0]
+            elif n == 127:
+                n = struct.unpack(">Q", need(8))[0]
+            if n > 65536:
+                raise ValueError("frame too big")
+            mask = need(4) if masked else b""
+            payload = need(n)
+            if masked:
+                payload = ws_unmask(payload, mask)
+            if op >= 8:                                   # control frame (close / ping / pong)
+                return op, payload
+            if first_op is None:
+                first_op = op
+            data += payload
+            if fin:
+                return first_op, data
+
+    def ws(self, q):
+        """One always-open connection; messages are pushed instantly both ways."""
+        r, cid = find_room(_arg(q, "room")), _arg(q, "id")
+        key = self.headers.get("Sec-WebSocket-Key")
+        if not r or cid not in r.names or not key:
             return self._send(404, '{"error":"unknown room"}')
-        try:
-            last = int(self.headers.get("Last-Event-ID") or 0)
-        except ValueError:
-            last = 0
-        qu = queue.Queue()
-        with r.lock:
-            for m in r.log[last:]:
-                qu.put((m["n"], m))
-            qu.put((None, {"t": "synced"}))
-            r.conns.setdefault(cid, []).append(qu)
-        r.presence()
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("X-Accel-Buffering", "no")
-        self.send_header("Connection", "close")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        accept = base64.b64encode(hashlib.sha1((key + WS_GUID).encode()).digest()).decode()
+        self.send_response(101)
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Connection", "Upgrade")
+        self.send_header("Sec-WebSocket-Accept", accept)
         self.end_headers()
         self.close_connection = True
+        sock = self.connection
+        sock.settimeout(75)
+        send_lock, alive = threading.Lock(), threading.Event()
+        alive.set()
+
+        def send(op, payload=b""):
+            frame = ws_frame(op, payload)
+            with send_lock:
+                sock.sendall(frame)
+
+        qu = r.attach(cid, _after(q))
+        r.presence()
+
+        def writer():
+            try:
+                while alive.is_set():
+                    try:
+                        item = qu.get(timeout=20)
+                    except queue.Empty:
+                        send(9)                           # keep-alive ping
+                        continue
+                    if item is None:
+                        break
+                    send(1, json.dumps(item))
+            except OSError:
+                pass
+            finally:
+                alive.clear()
+
+        threading.Thread(target=writer, daemon=True).start()
         try:
-            while True:
-                try:
-                    n, m = qu.get(timeout=15)
-                except queue.Empty:
-                    self.wfile.write(b": ping\n\n")
-                    self.wfile.flush()
-                    continue
-                out = ("id: %d\n" % n if n else "") + "data: " + json.dumps(m) + "\n\n"
-                self.wfile.write(out.encode("utf-8"))
-                self.wfile.flush()
-        except OSError:
+            while alive.is_set():
+                op, payload = self.ws_read()
+                if op == 8:
+                    break
+                if op == 9:
+                    send(10, payload)
+                elif op == 1:
+                    try:
+                        msg = json.loads(payload.decode("utf-8"))
+                    except Exception:
+                        continue
+                    api_send({"room": r.code, "id": cid, "msg": msg})
+        except (OSError, ValueError):
             pass
         finally:
-            with r.lock:
-                if cid in r.conns and qu in r.conns[cid]:
-                    r.conns[cid].remove(qu)
-                    if not r.conns[cid]:
-                        del r.conns[cid]
+            alive.clear()
+            qu.put(None)
+            r.detach(cid, qu)
             r.presence()
-
-    def log_message(self, *a):
-        pass
+            try:
+                send(8)
+            except OSError:
+                pass
 
 
 class Server(http.server.ThreadingHTTPServer):
@@ -1345,9 +1392,12 @@ class Server(http.server.ThreadingHTTPServer):
     allow_reuse_address = True
 
     def handle_error(self, request, client_address):
-        pass            # ignore dropped phone connections quietly
+        pass                                              # ignore dropped phone connections quietly
 
 
+# ============================================================================
+# 6. MAIN
+# ============================================================================
 def lan_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -1361,11 +1411,11 @@ def lan_ip():
 
 def main():
     load_rooms()
-    hosted = "PORT" in os.environ            # cloud hosts give a PORT
+    hosted = "PORT" in os.environ                         # cloud hosts give a PORT
     port = int(os.environ.get("PORT", 8000))
     while True:
         try:
-            srv = Server(("0.0.0.0", port), H)
+            srv = Server(("0.0.0.0", port), Handler)
             break
         except OSError:
             if hosted:
