@@ -67,3 +67,7 @@ MAKE THE WEB VERSION AVAILABLE TO MULTIPLAYER (anyone, any phone/PC browser - no
  1. Put ludo.py on a server people can reach (Render.com free / a VPS / your PC + tunnel) - see options A, B, C above.
  2. Open the server's https link, tap "Play Online with Friends", create a room, press "Invite friends".
  3. Friends open the shared link in any browser, enter a name, and join. The host presses Start.
+
+FUN EFFECTS: when a goti is cut, the killer turns into a cartoon hammer that smashes the victim while a cartoon dhol player
+ plays a Punjabi dhol and shouts "Wo maara!". When a goti reaches home, a wedding shehnai plays and a cute girl pushes
+ the lota (griha pravesh). Voices use the phone's text-to-speech (Hindi voice is used if installed).

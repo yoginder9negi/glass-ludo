@@ -90,6 +90,22 @@ input::placeholder{color:#ffffffaa}
 #skip{padding:8px 10px;font-size:13px}
 #tl{position:fixed;top:8px;left:8px;z-index:6;display:flex;gap:6px}
 #tl button{padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
+.toon{position:fixed;z-index:28;pointer-events:none;width:132px;opacity:0;transition:transform .4s cubic-bezier(.2,1.4,.4,1),opacity .25s;bottom:8px}
+#toonL{left:4px;transform:translateX(-170%)}
+#toonR{right:4px;transform:translateX(170%)}
+.toon.show{opacity:1;transform:none}
+.toon .bub{position:absolute;top:-24px;left:50%;transform:translateX(-50%);white-space:nowrap;font-weight:800;font-size:13px;background:#fff;color:#b3122a;padding:3px 10px;border-radius:12px;box-shadow:0 2px 8px #0007}
+.toon svg{width:100%;height:auto;filter:drop-shadow(0 4px 6px #0008)}
+.dh{animation:dbob .3s ease-in-out infinite alternate}@keyframes dbob{to{transform:translateY(-4px)}}
+.s1{transform-origin:42px 84px;animation:sh .28s ease-in-out infinite alternate}
+.s2{transform-origin:78px 84px;animation:sh .28s ease-in-out infinite alternate-reverse}
+@keyframes sh{from{transform:rotate(-14deg)}to{transform:rotate(10deg)}}
+.ft{transform-origin:74px 94px;animation:push 1.1s ease-in-out infinite alternate}
+@keyframes push{to{transform:rotate(-26deg)}}
+.lt{transform-origin:115px 117px;animation:tipl 1.2s ease-out .35s infinite alternate}
+@keyframes tipl{to{transform:translateX(9px) rotate(26deg)}}
+.rc{animation:rice 1.2s ease-in .5s infinite}
+@keyframes rice{0%{transform:translate(0,0);opacity:1}100%{transform:translate(var(--dx,8px),20px);opacity:0}}
 #tools{position:fixed;top:8px;right:8px;z-index:6;display:flex;gap:6px}
 #tools button{padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
 #net{position:fixed;bottom:6px;right:8px;font-size:11px;z-index:6;padding:2px 9px;border-radius:10px;background:rgba(0,0,0,.4)}
@@ -118,6 +134,39 @@ body.lite .f{box-shadow:inset 0 0 8px #fff8}
 </div>
 <div id="stamp">✍️ Developed by Yoginder Singh Negi</div>
 <div id="tools"><button id="lite"></button><button id="spd"></button></div><div id="tl"><button id="quit" class="hide">🚪 Quit</button><button id="fin" class="hide">🏁 Finish</button></div><div id="net" class="hide"></div>
+<div id="toonL" class="toon"><div class="bub">Wo maara! 🥁</div><svg viewBox="0 0 120 120"><g class="dh">
+  <path d="M28 120 Q28 76 60 76 Q92 76 92 120Z" fill="#ff8c1a"/>
+  <ellipse cx="60" cy="98" rx="40" ry="14" fill="#8b4a1c"/>
+  <ellipse cx="21" cy="98" rx="7" ry="14" fill="#f5deb3" stroke="#6b3410" stroke-width="2"/>
+  <ellipse cx="99" cy="98" rx="7" ry="14" fill="#f5deb3" stroke="#6b3410" stroke-width="2"/>
+  <path d="M26 87 L40 109 L54 87 L68 109 L82 87 L94 107" stroke="#ffd23f" stroke-width="2.5" fill="none"/>
+  <circle cx="60" cy="52" r="20" fill="#f2b27a"/>
+  <path d="M38 50 Q38 22 60 22 Q82 22 82 50 Q60 40 38 50Z" fill="#e63946"/>
+  <path d="M42 36 Q60 26 78 36" stroke="#ffd23f" stroke-width="3" fill="none"/>
+  <circle cx="60" cy="26" r="5" fill="#ffd23f"/>
+  <circle cx="52" cy="54" r="2.6" fill="#222"/><circle cx="68" cy="54" r="2.6" fill="#222"/>
+  <path d="M47 63 Q54 57 60 62 Q66 57 73 63 Q66 68 60 64 Q54 68 47 63Z" fill="#222"/>
+  <ellipse cx="60" cy="71" rx="5" ry="3.5" fill="#7a1f1f"/>
+  <g class="s1"><line x1="42" y1="84" x2="24" y2="68" stroke="#f2b27a" stroke-width="7" stroke-linecap="round"/><line x1="24" y1="68" x2="14" y2="50" stroke="#8b5a2b" stroke-width="3.5" stroke-linecap="round"/></g>
+  <g class="s2"><line x1="78" y1="84" x2="96" y2="68" stroke="#f2b27a" stroke-width="7" stroke-linecap="round"/><line x1="96" y1="68" x2="106" y2="50" stroke="#8b5a2b" stroke-width="3.5" stroke-linecap="round"/></g>
+</g></svg></div>
+<div id="toonR" class="toon"><div class="bub">Griha Pravesh 🏠</div><svg viewBox="0 0 140 120"><g>
+  <path d="M34 118 L50 62 L78 62 L94 118Z" fill="#ff4fa3"/>
+  <path d="M50 62 Q64 52 80 62 L86 92 Q70 82 52 88Z" fill="#ffd23f" opacity="0.92"/>
+  <path d="M40 112 L88 112" stroke="#fff" stroke-width="2" stroke-dasharray="4 3"/>
+  <circle cx="64" cy="42" r="19" fill="#f6c28b"/>
+  <path d="M44 40 Q44 18 64 18 Q84 18 84 40 Q76 27 64 27 Q52 27 44 40Z" fill="#2b1b17"/>
+  <ellipse cx="42" cy="52" rx="5" ry="11" fill="#2b1b17"/><ellipse cx="86" cy="52" rx="5" ry="11" fill="#2b1b17"/>
+  <circle cx="42" cy="42" r="4" fill="#ff4fa3"/><circle cx="86" cy="42" r="4" fill="#ff4fa3"/>
+  <circle cx="64" cy="31" r="2.2" fill="#e63946"/>
+  <ellipse cx="57" cy="44" rx="3" ry="3.6" fill="#222"/><ellipse cx="71" cy="44" rx="3" ry="3.6" fill="#222"/>
+  <circle cx="58" cy="42.6" r="1.1" fill="#fff"/><circle cx="72" cy="42.6" r="1.1" fill="#fff"/>
+  <circle cx="51" cy="51" r="3.5" fill="#ff8fa3" opacity="0.6"/><circle cx="77" cy="51" r="3.5" fill="#ff8fa3" opacity="0.6"/>
+  <path d="M58 52 Q64 58 70 52" stroke="#a33" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <g class="ft"><rect x="70" y="94" width="9" height="20" rx="4" fill="#f6c28b" transform="rotate(-8 74 94)"/><ellipse cx="82" cy="116" rx="10" ry="4.5" fill="#f6c28b"/><path d="M72 111 Q81 106 91 111" stroke="#ffd23f" stroke-width="2" fill="none"/></g>
+  <g class="lt"><path d="M100 104 Q96 86 108 80 L122 80 Q134 86 130 104 Q130 117 115 117 Q100 117 100 104Z" fill="#e0a526" stroke="#b07a0f" stroke-width="2"/><ellipse cx="115" cy="80" rx="9" ry="3.5" fill="#fff2b0"/><circle cx="115" cy="72" r="8" fill="#8b5a2b"/><path d="M107 74 Q100 64 108 61 M123 74 Q130 64 122 61" stroke="#2ea043" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <circle class="rc" cx="124" cy="112" r="2" fill="#fff" style="--dx:10px"/><circle class="rc" cx="130" cy="114" r="2" fill="#fff" style="--dx:16px;animation-delay:.7s"/><circle class="rc" cx="120" cy="114" r="2" fill="#fff" style="--dx:6px;animation-delay:.9s"/>
+</g></svg></div>
 <div id="toast"></div>
 <div id="setup" class="ov"><div class="glass">
   <h2 style="margin:0 0 2px">🎲 New Game</h2>
@@ -243,6 +292,57 @@ function sfxSorry(){boost=2.2;const t=now();
   else if(window.speechSynthesis){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(say);u.rate=.85;u.pitch=1.8;u.volume=1;speechSynthesis.speak(u)}catch(e){}}}
 function sfxWin(){const t=now();[523,659,784,1047,1319].forEach((f,i)=>tone('triangle',f,f*1.01,t+i*.14,.5,.3,2000))}
 function sfxHome(){const t=now();[784,988,1319].forEach((f,i)=>tone('triangle',f,f*1.01,t+i*.1,.3,.3,2000))}
+/* --- Punjabi dhol (kill) --- */
+function dholHit(t,k){if(k==='d'){tone('sine',160,52,t,.3,.7,320);noise(t,.07,.4,1300)}else if(k==='t'){noise(t,.05,.38,4800);tone('triangle',950,520,t,.07,.22,2600)}}
+function sfxDhol(){boost=2.4;const t=now(),P='dttdtdttddtdttdt';for(let i=0;i<P.length;i++)dholHit(t+i*.15,P[i]);boost=1}
+function voiceMaara(){if(muted||FAST)return;const say='Wo maara!';
+  if(window.AndroidTTS){try{if(AndroidTTS.speakEx)AndroidTTS.speakEx(say,1.15,1);else AndroidTTS.speak(say)}catch(e){}return}
+  if(window.speechSynthesis){try{speechSynthesis.cancel();const hv=(speechSynthesis.getVoices()||[]).some(v=>/^(hi|pa)/i.test(v.lang));
+    const u=new SpeechSynthesisUtterance(hv?'वो मारा!':say);u.lang=hv?'hi-IN':'en-IN';u.rate=1;u.pitch=1.15;u.volume=1;speechSynthesis.speak(u)}catch(e){}}}
+function sfxKill(){sfxDhol();voiceMaara()}
+/* --- wedding shehnai (home) --- */
+function shNote(f,t,d,prev){const a=A(),o1=a.createOscillator(),o2=a.createOscillator(),lfo=a.createOscillator(),lg=a.createGain(),mix=a.createGain(),
+    g1=a.createGain(),g2=a.createGain(),f1=a.createBiquadFilter(),f2=a.createBiquadFilter(),g=a.createGain();
+  o1.type='sawtooth';o2.type='square';o2.detune.value=9;
+  [o1,o2].forEach(o=>{o.frequency.setValueAtTime(prev,t);o.frequency.exponentialRampToValueAtTime(f,t+.08)});
+  lfo.frequency.value=5.5;lg.gain.value=f*.014;lfo.connect(lg);lg.connect(o1.frequency);lg.connect(o2.frequency);
+  g1.gain.value=.55;g2.gain.value=.22;o1.connect(g1);o2.connect(g2);g1.connect(mix);g2.connect(mix);
+  f1.type='bandpass';f1.frequency.value=1250;f1.Q.value=3;f2.type='peaking';f2.frequency.value=2600;f2.gain.value=9;
+  mix.connect(f1);f1.connect(f2);f2.connect(g);g.connect(OUT);
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.4,t+.07);g.gain.setValueAtTime(.36,t+d-.08);g.gain.linearRampToValueAtTime(.0001,t+d+.05);
+  [o1,o2,lfo].forEach(o=>{o.start(t);o.stop(t+d+.08)})}
+function sfxShehnai(){if(muted||FAST)return;const a=A(),t=now();
+  const dr=a.createOscillator(),dg=a.createGain(),df=a.createBiquadFilter();dr.type='sawtooth';dr.frequency.value=130.8;df.type='lowpass';df.frequency.value=420;
+  dg.gain.setValueAtTime(.0001,t);dg.gain.linearRampToValueAtTime(.12,t+.4);dg.gain.linearRampToValueAtTime(.0001,t+3.5);dr.connect(df);df.connect(dg);dg.connect(OUT);dr.start(t);dr.stop(t+3.6);
+  const N=[[392,0,.32],[440,.32,.28],[494,.6,.28],[587,.88,.5],[523,1.4,.28],[494,1.68,.28],[440,1.96,.28],[494,2.24,.32],[392,2.6,.9]];
+  N.forEach((n,i)=>shNote(n[0],t+n[1],n[2],i?N[i-1][0]:n[0]))}
+/* --- cartoons --- */
+function showToon(id,ms){if(FAST)return;const e=$('#'+id);e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),ms)}
+const HAMMER_SVG='<svg viewBox="0 0 100 100" width="100%" height="100%"><rect x="45" y="22" width="10" height="72" rx="4" fill="#b5651d" stroke="#6b3a10" stroke-width="2"/><rect x="18" y="6" width="64" height="30" rx="8" fill="#e63946" stroke="#7a1010" stroke-width="2"/><rect x="24" y="10" width="52" height="6" rx="3" fill="#fff" opacity="0.4"/><rect x="18" y="6" width="9" height="30" rx="4" fill="#ffd23f"/><rect x="73" y="6" width="9" height="30" rx="4" fill="#ffd23f"/><circle cx="42" cy="23" r="3.6" fill="#fff"/><circle cx="58" cy="23" r="3.6" fill="#fff"/><circle cx="43" cy="24" r="1.8" fill="#111"/><circle cx="59" cy="24" r="1.8" fill="#111"/><path d="M36 15 L47 19 M64 15 L53 19" stroke="#111" stroke-width="2.5" stroke-linecap="round"/></svg>';
+async function hammerHit(c,i,v,onHit,after){
+  if(FAST){onHit&&onHit();after&&after();return}
+  const bd=$('#board'),br=bd.getBoundingClientRect(),kel=tokEl[c][i],vs=v.map(([o,j])=>tokEl[o][j]);
+  await rs(90);
+  const ctr=el=>{const r=el.getBoundingClientRect();return[r.left+r.width/2-br.left,r.top+r.height/2-br.top,r.width]};
+  const [vx,vy,sz]=ctr(vs[0]),S=sz*2.8,R=.76*S,d=Math.max(.4,SP)*1000;
+  const h=document.createElement('div');
+  h.style.cssText=`position:absolute;z-index:12;pointer-events:none;width:${S}px;height:${S}px;left:${vx+R-S/2}px;top:${vy-.94*S}px;transform-origin:50% 94%;opacity:0`;
+  h.innerHTML=HAMMER_SVG;bd.appendChild(h);
+  const ghosts=vs.map(el=>{const [x,y,w]=ctr(el),gh=document.createElement('div');
+    gh.style.cssText=`position:absolute;z-index:11;border-radius:50%;pointer-events:none;border:2px solid #fff;width:${w}px;height:${w}px;left:${x}px;top:${y}px;background:${el.style.background};box-shadow:0 3px 6px #0007;transform:translate(-50%,-50%)`;
+    bd.appendChild(gh);el.style.visibility='hidden';return gh});
+  kel.style.visibility='hidden';                       /* the killer token turns into the hammer */
+  h.animate([{transform:'rotate(55deg)',opacity:0},{transform:'rotate(32deg)',opacity:1,offset:.28},{transform:'rotate(-90deg)',opacity:1,offset:.55},
+    {transform:'rotate(-90deg)',opacity:1,offset:.85},{transform:'rotate(-90deg)',opacity:0}],{duration:d*1.7,easing:'ease-in-out',fill:'forwards'});
+  await rs(d*1.7*.55);
+  onHit&&onHit();
+  bd.animate([{transform:'translate(0,0)'},{transform:'translate(-6px,4px)'},{transform:'translate(6px,-4px)'},{transform:'translate(-4px,2px)'},{transform:'translate(0,0)'}],{duration:280});
+  burst(ghosts[0],26,['#fff','#ffd23f','#ff4d6d']);
+  ghosts.forEach(gh=>gh.animate([{transform:'translate(-50%,-50%) scale(1,1)'},{transform:'translate(-50%,-30%) scale(1.6,.18)',offset:.2},
+    {transform:'translate(-50%,-30%) scale(1.6,.18)',offset:.5},{transform:'translate(-50%,-260%) scale(.2) rotate(500deg)',opacity:0}],{duration:d*1.2,fill:'forwards'}));
+  await rs(d*.9);
+  ghosts.forEach(gh=>gh.remove());after&&after();vs.forEach(el=>el.style.visibility='');kel.style.visibility='';
+  await rs(d*.35);h.remove()}
 $('#snd').onpointerdown=e=>{e.preventDefault();muted=!muted;$('#snd').textContent=muted?'🔇':'🔊'};
 
 /* ---------- effects ---------- */
@@ -357,9 +457,11 @@ async function doMove(c,i){if(busy||phase!=='move')return;busy=true;phase='movin
     T[c][i]=np;place();sfxTick();await sleep(150);if(g!==gen)return}
   const np=T[c][i];let extra=roll===6;
   const v=victims(c,np);
-  if(v.length){v.forEach(([o,j])=>T[o][j]=-1);killed[c]=true;sfxCut();flash('#c000ff');toast('💀 CUT! Muahaha!');
-    burst(tokEl[c][i],70,[HEX[c],'#fff','#c000ff']);place();extra=true;await sleep(1000);if(g!==gen)return}
-  if(np===FIN_P){sfxHome();toast('🏠 Home!');burst(tokEl[c][i],40);extra=true;await sleep(400)}
+  if(v.length){
+    await hammerHit(c,i,v,()=>{sfxKill();showToon('toonL',2900);flash('#ffb000');toast('🥁 Wo maara!')},()=>{v.forEach(([o,j])=>T[o][j]=-1);killed[c]=true;place()});
+    if(g!==gen)return;
+    burst(tokEl[c][i],50,[HEX[c],'#fff','#ffd23f']);extra=true;await sleep(600);if(g!==gen)return}
+  if(np===FIN_P){sfxShehnai();showToon('toonR',3500);toast('🏠 Griha Pravesh!');burst(tokEl[c][i],40);extra=true;await sleep(400)}
   if(T[c].filter(x=>x===FIN_P).length>=WINN){endGame(c);return}
   if(extra)startTurn();else nextTurn()}
 
