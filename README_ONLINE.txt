@@ -1,4 +1,4 @@
-GLASS LUDO - ONLINE MULTIPLAYER  (Prepared by Yoginder Singh Negi)
+GLASS LUDO - ONLINE MULTIPLAYER  (Developed by Yoginder Singh Negi)
 ===================================================================
 HOW PLAYERS JOIN
  1. Host opens the game > "Play Online with Friends" > type name > "Create room".
@@ -58,3 +58,12 @@ LOWEST LATENCY (REAL TIME)
         cloudflared tunnel --url http://localhost:8000   and share the https link it prints.
  - Next best: Render with Region = Singapore. Avoid far regions (USA/Europe).
  - Watch the 🟢 ms badge at the top of the screen: under 150 ms feels real time.
+
+QUIT: the 🚪 Quit button (top-left, during a game) lets any player leave. Offline it returns to the menu.
+ Online, the others carry on: the quitter's turns are skipped, the host role passes to someone still playing,
+ and if only one player remains that player wins.
+
+MAKE THE WEB VERSION AVAILABLE TO MULTIPLAYER (anyone, any phone/PC browser - nothing to install):
+ 1. Put ludo.py on a server people can reach (Render.com free / a VPS / your PC + tunnel) - see options A, B, C above.
+ 2. Open the server's https link, tap "Play Online with Friends", create a room, press "Invite friends".
+ 3. Friends open the shared link in any browser, enter a name, and join. The host presses Start.

@@ -3,5 +3,8 @@ services:
     name: glass-ludo
     runtime: python
     plan: free
+    region: singapore          # closest to India; change if your players are elsewhere
     buildCommand: "echo no build needed"
     startCommand: "python ludo.py"
+    healthCheckPath: /health
+    autoDeploy: true

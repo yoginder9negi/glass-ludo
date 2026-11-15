@@ -49,7 +49,7 @@ h1{margin:0;z-index:1;font-size:clamp(16px,3.2vw,26px);letter-spacing:3px;backgr
 .tk::after{content:"";position:absolute;left:22%;top:14%;width:32%;height:22%;border-radius:50%;background:#fffc;filter:blur(1px)}
 .tk.can{z-index:9;animation:hop .5s ease-in-out infinite;box-shadow:0 0 0 3px #fff,0 0 18px 7px currentColor}
 @keyframes hop{50%{transform:translate(calc(-50% + var(--ox,0%)),calc(-80% + var(--oy,0%)))}}
-#ui{z-index:1;display:flex;align-items:center;gap:14px;padding:8px 16px;border-radius:22px}
+#ui{z-index:1;display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:22px;width:min(96vw,430px);height:110px;flex:none}
 @property --pc{syntax:'<color>';inherits:true;initial-value:#ff7ae0}
 @property --pd{syntax:'<color>';inherits:true;initial-value:#7a2cff}
 #scene{--pc:#ff7ae0;--pd:#7a2cff;transition:--pc .22s,--pd .22s;width:88px;height:88px;perspective:520px;cursor:pointer;touch-action:manipulation;padding:0;filter:drop-shadow(0 12px 10px #0009)}
@@ -58,7 +58,7 @@ h1{margin:0;z-index:1;font-size:clamp(16px,3.2vw,26px);letter-spacing:3px;backgr
 .f::before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.65),transparent 42%,transparent 70%,rgba(255,255,255,.25))}
 .f i{width:18px;height:18px;border-radius:50%;margin:auto;background:radial-gradient(circle at 35% 30%,#8a86b8 0,#1a1033 55%,#000 100%);box-shadow:0 0 0 2px #fff8,0 0 8px #fff9,inset -1px -1px 2px #0008}
 #scene.wait{animation:bob 1.1s ease-in-out infinite}
-@keyframes bob{0%,100%{transform:translateY(0);filter:drop-shadow(0 0 6px var(--pc)) drop-shadow(0 12px 10px #0009)}50%{transform:translateY(-7px) scale(1.07);filter:drop-shadow(0 0 26px var(--pc)) drop-shadow(0 16px 12px #0009)}}
+@keyframes bob{0%,100%{filter:drop-shadow(0 0 6px var(--pc)) drop-shadow(0 12px 10px #0009)}50%{filter:drop-shadow(0 0 24px var(--pc)) drop-shadow(0 12px 10px #0009)}}
 #scene.rolling{animation:toss 1s ease-out}
 @keyframes toss{40%{transform:translateY(-34px) scale(1.3)}100%{transform:none}}
 #scene.six{animation:shake .7s}
@@ -66,7 +66,7 @@ h1{margin:0;z-index:1;font-size:clamp(16px,3.2vw,26px);letter-spacing:3px;backgr
 @keyframes sad{15%{transform:rotate(-14deg) translateY(8px)}35%{transform:rotate(10deg) translateY(10px)}55%{transform:rotate(-6deg) translateY(8px)}100%{transform:none}}
 #scene.six #cube{filter:drop-shadow(0 0 20px #ffd23f) drop-shadow(0 0 44px #ff4dd8)}
 @keyframes shake{20%{transform:scale(1.5) rotate(-10deg)}40%{transform:scale(1.5) rotate(10deg)}60%{transform:scale(1.4) rotate(-6deg)}100%{transform:scale(1)}}
-#st{min-width:130px;font-size:14px;font-weight:600;line-height:1.5;text-shadow:0 2px 6px #0008}
+#st{flex:1;min-width:0;height:68px;overflow:hidden;display:flex;flex-direction:column;justify-content:center;font-size:13px;font-weight:600;line-height:1.45;text-shadow:0 2px 6px #0008}
 #st b{padding:2px 10px;border-radius:12px;color:#111}
 #st small{opacity:.9;font-weight:500}
 #stamp{z-index:1;font-size:11px;letter-spacing:1.2px;font-weight:600;padding:3px 14px;border-radius:14px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);text-shadow:0 0 8px #ff7ae0,0 1px 3px #0008;box-shadow:0 0 12px rgba(255,122,224,.35)}
@@ -88,10 +88,11 @@ input::placeholder{color:#ffffffaa}
 #rcode{width:130px;letter-spacing:4px;text-transform:uppercase}
 #rc{font-size:40px;font-weight:900;letter-spacing:8px;text-shadow:0 0 14px #ff7ae0}
 #skip{padding:8px 10px;font-size:13px}
-#fin{position:fixed;top:8px;left:8px;z-index:6;padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
+#tl{position:fixed;top:8px;left:8px;z-index:6;display:flex;gap:6px}
+#tl button{padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
 #tools{position:fixed;top:8px;right:8px;z-index:6;display:flex;gap:6px}
 #tools button{padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
-#net{position:fixed;top:10px;left:50%;transform:translateX(-50%);font-size:11px;z-index:6;padding:2px 9px;border-radius:10px;background:rgba(0,0,0,.4)}
+#net{position:fixed;bottom:6px;right:8px;font-size:11px;z-index:6;padding:2px 9px;border-radius:10px;background:rgba(0,0,0,.4)}
 body.lite{animation:none;background:linear-gradient(135deg,#1b0b3a,#0b2a5b,#3a0b4f)}
 body.lite .blob{display:none}
 body.lite .glass,body.lite .ov{backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -113,14 +114,14 @@ body.lite .f{box-shadow:inset 0 0 8px #fff8}
 <div id="ui" class="glass">
   <div id="scene" class="wait"><div id="cube"></div></div>
   <div id="st">…</div>
-  <button id="skip" class="hide">⏭ Skip</button><button id="snd">🔊</button>
+  <button id="skip" class="hide" title="Skip absent player">⏭</button><button id="snd">🔊</button>
 </div>
-<div id="stamp">✍️ Prepared by Yoginder Singh Negi</div>
-<div id="tools"><button id="lite"></button><button id="spd"></button></div><button id="fin" class="hide">🏁 Finish</button><div id="net" class="hide"></div>
+<div id="stamp">✍️ Developed by Yoginder Singh Negi</div>
+<div id="tools"><button id="lite"></button><button id="spd"></button></div><div id="tl"><button id="quit" class="hide">🚪 Quit</button><button id="fin" class="hide">🏁 Finish</button></div><div id="net" class="hide"></div>
 <div id="toast"></div>
 <div id="setup" class="ov"><div class="glass">
   <h2 style="margin:0 0 2px">🎲 New Game</h2>
-  <div class="by">Prepared by Yoginder Singh Negi</div>
+  <div class="by">Developed by Yoginder Singh Negi</div>
   <div style="font-size:13px;opacity:.9">Choose start corners</div>
   <div id="presets"><button data-p="d1">2P ⤡ Red–Yellow</button><button data-p="d2">2P ⤢ Green–Blue</button><button data-p="p3">3 Players</button><button data-p="p4">4 Players</button></div>
   <div id="opts"></div>
@@ -160,7 +161,7 @@ body.lite .f{box-shadow:inset 0 0 8px #fff8}
   <div id="onErr" style="color:#ffb3c1;margin:6px 0;min-height:18px"></div>
   <button id="onBack">← Back</button>
 </div></div>
-<div id="win" class="ov hide"><div class="glass"><h1 id="wt" style="font-size:34px;-webkit-text-fill-color:#fff"></h1><div id="rank" style="margin:8px 0;min-width:220px"></div><div class="by">Prepared by Yoginder Singh Negi</div><button id="again">Play again</button></div></div>
+<div id="win" class="ov hide"><div class="glass"><h1 id="wt" style="font-size:34px;-webkit-text-fill-color:#fff"></h1><div id="rank" style="margin:8px 0;min-width:220px"></div><div class="by">Developed by Yoginder Singh Negi</div><button id="again">Play again</button></div></div>
 
 <script>
 /* ---------- geometry (L=6 -> standard 15x15 board, 52-step track) ---------- */
@@ -234,9 +235,12 @@ function sfxCut(){boost=2.8;const t=now();tone('sawtooth',2400,110,t,.55,.35,260
     tone('sawtooth',b,b*.5,s,.18,.42,800);tone('square',b*.5,b*.25,s,.18,.22,500);tone('sawtooth',b*2.2,b*1.2,s,.1,.12,1800)}
   tone('sawtooth',900,2600,t+2.2,.7,.32,2200);boost=1}
 function sfxSorry(){boost=2.2;const t=now();
-  tone('sawtooth',420,300,t,.4,.3,900);tone('sawtooth',360,250,t+.42,.4,.3,800);tone('sawtooth',300,150,t+.84,.9,.32,700);boost=1;
-  if(!muted&&!FAST&&window.AndroidTTS){try{AndroidTTS.speak('Uff... sorry!')}catch(e){}}
-  else if(!muted&&!FAST&&window.speechSynthesis){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance('Uff... sorry!');u.rate=.75;u.pitch=.6;u.volume=1;speechSynthesis.speak(u)}catch(e){}}}
+  tone('sine',1300,350,t,.55,.35,1800);   // cartoon slide-whistle drop
+  tone('triangle',520,300,t+.6,.22,.35,1200);tone('triangle',460,260,t+.85,.22,.35,1100);tone('triangle',400,160,t+1.1,.6,.38,1000);   // "wah wah waaah"
+  boost=1;if(FAST||muted)return;
+  const say='Ooops... Sorryyy!';
+  if(window.AndroidTTS){try{if(AndroidTTS.speakEx)AndroidTTS.speakEx(say,1.7,.85);else AndroidTTS.speak(say)}catch(e){}}
+  else if(window.speechSynthesis){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(say);u.rate=.85;u.pitch=1.8;u.volume=1;speechSynthesis.speak(u)}catch(e){}}}
 function sfxWin(){const t=now();[523,659,784,1047,1319].forEach((f,i)=>tone('triangle',f,f*1.01,t+i*.14,.5,.3,2000))}
 function sfxHome(){const t=now();[784,988,1319].forEach((f,i)=>tone('triangle',f,f*1.01,t+i*.1,.3,.3,2000))}
 $('#snd').onpointerdown=e=>{e.preventDefault();muted=!muted;$('#snd').textContent=muted?'🔇':'🔊'};
@@ -253,7 +257,7 @@ function burst(el,n=36,cols=Object.values(HEX)){const r=el.getBoundingClientRect
 
 /* ---------- game state ---------- */
 let mode={red:'human',green:'off',yellow:'cpu',blue:'off'},players=[],T={},killed={},cur=0,roll=0,phase='idle',busy=false,gen=0,sixCount=0,snap=null;
-let ONLINE=false,me={},names={},lastN=0,sentRoll=false,sentMove=false,onlineOn=[],started=false,lobbySeats={},lobbyHost='',es=null,BASE='',pollGen=0,synced=false,WINN=4,ws=null,spinning=false,selfMoves=0;
+let leftSet=new Set(),ONLINE=false,me={},names={},lastN=0,sentRoll=false,sentMove=false,onlineOn=[],started=false,lobbySeats={},lobbyHost='',es=null,BASE='',pollGen=0,synced=false,WINN=4,ws=null,spinning=false,selfMoves=0;
 function normBase(v){v=(v||'').trim();if(!v)return'';try{return new URL(/^https?:\/\//i.test(v)?v:((/^(\d+\.\d+\.\d+\.\d+|localhost)/.test(v)?'http://':'https://')+v)).origin}catch(e){return''}}
 if(location.protocol==='file:'){try{BASE=normBase(localStorage.getItem('ludoServer'))}catch(e){}}
 const tokEl={};
@@ -272,7 +276,7 @@ $('#go').onclick=()=>{COLORS.forEach(c=>mode[c]=$('#m_'+c).value);players=COLORS
   A();$('#setup').classList.add('hide');newGame()};
 $('#again').onclick=()=>{$('#win').classList.add('hide');$('#setup').classList.remove('hide')};
 
-function newGame(res){gen++;phase='idle';$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());
+function newGame(res){gen++;phase='idle';leftSet.clear();$('#quit').classList.remove('hide');$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());
   T={};killed={};
   players.forEach(c=>{T[c]=res?res.T[c]:[-1,-1,-1,-1];killed[c]=res?!!res.killed[c]:false;tokEl[c]=[0,1,2,3].map(i=>{const e=document.createElement('div');e.className='tk';
     e.style.width=e.style.height=(100/N*.92)+'%';
@@ -291,9 +295,11 @@ function place(slow){const g={};
 
 const pn=c=>names[c]||NAME[c];
 const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 cut a goti to open home';
-function say(t){const c=players[cur];$('#st').innerHTML=`<b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small>`}
+function say(t){const c=players[cur];$('#st').innerHTML=`<div><b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small></div>`}
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
-function startTurn(){if(phase==='over')return;phase='roll';busy=false;const c=players[cur];if(!ONLINE)saveLocal();
+function startTurn(){if(phase==='over')return;
+  if(leftSet.has(players[cur])){phase='skip';busy=true;const g=gen;setTimeout(()=>{if(g===gen&&phase==='skip'){busy=false;nextTurn()}},250*SP);return}
+  phase='roll';busy=false;const c=players[cur];if(!ONLINE)saveLocal();
   $('#scene').style.setProperty('--pc',HEX[c]);$('#scene').style.setProperty('--pd',shade(HEX[c],.55));
   const mine=!ONLINE||c===me.color;
   say(mode[c]==='cpu'?'(CPU) rolling…':mine?'tap the dice 🎲':'is playing…');
@@ -331,7 +337,7 @@ async function rollDice(forced){if(busy||phase!=='roll')return;busy=true;phase='
   await sleep(1050);if(g!==gen)return;
   sc.classList.remove('rolling');sc.style.animationDuration='';cube.style.transition='none';cube.style.transform=`${TILT} rotateX(${ax}deg) rotateY(${ay}deg)`;
   const mv=(roll===6&&sixCount===3)?[]:movable(c),useless=roll===6&&sixCount<3&&!mv.length;
-  if(roll===6){if(useless){sc.classList.add('sad');sfxSorry();toast('😖 Uff… sorry!')}else{sc.classList.add('six');sfxSix();flash('#ffd23f');burst(sc,60)}}
+  if(roll===6){if(useless){sc.classList.add('sad');sfxSorry();toast('😅 Ooops… Sorryy!')}else{sc.classList.add('six');sfxSix();flash('#ffd23f');burst(sc,60)}}
   if(roll===6&&sixCount===3){toast('🚫 3 SIXES! Turn lost');say('rolled 3 sixes!');await sleep(1300);if(g!==gen)return;
     const s=JSON.parse(snap);players.forEach(p=>T[p]=s.T[p]);Object.assign(killed,s.killed);place(true);sixCount=0;await sleep(900);if(g!==gen)return;nextTurn();return}
   if(roll===6&&!useless)toast('🧙‍♀️ SIX! Hehehe!');
@@ -357,7 +363,7 @@ async function doMove(c,i){if(busy||phase!=='move')return;busy=true;phase='movin
   if(T[c].filter(x=>x===FIN_P).length>=WINN){endGame(c);return}
   if(extra)startTurn();else nextTurn()}
 
-function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');
+function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');$('#quit').classList.add('hide');
   const prog=c=>T[c].reduce((a,x)=>a+(x<0?0:x<HB?x:LAST+1+(x-HB)),0);
   const rows=players.map(c=>({c,h:T[c].filter(x=>x===FIN_P).length,p:prog(c)})).sort((a,b)=>b.h-a.h||b.p-a.p);
   if(w0){const wi=rows.findIndex(r=>r.c===w0);if(wi>0)rows.unshift(rows.splice(wi,1)[0])}
@@ -367,6 +373,11 @@ function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.
     dot.className='dot';dot.style.background=HEX[r.c];dot.style.color=HEX[r.c];l.append(dot,document.createTextNode((i+1)+'. '+pn(r.c)));
     const rr=document.createElement('span');rr.textContent=r.h+' home';d.append(l,rr);box.appendChild(d)});
   $('#win').classList.remove('hide');for(let k=0;k<5;k++)setTimeout(()=>burst($('#wt'),50),k*300)}
+$('#quit').onclick=()=>{if(!confirm(ONLINE?'Quit this game? You leave your seat and the others carry on.':'Quit this game and go back to the menu?'))return;
+  if(ONLINE){const x={room:me.room,id:me.id};leaveOnline();api('/api/leave',x)}else clearLocal();
+  gen++;phase='idle';busy=true;['#fin','#quit','#skip','#win'].forEach(q=>$(q).classList.add('hide'));
+  Object.values(tokEl).flat().forEach(e=>e.remove());$('#st').textContent='';
+  $('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide');$('#setup').classList.remove('hide')};
 $('#fin').onclick=()=>{if(phase==='over')return;if(!confirm('Finish the game now and show the result?'))return;if(ONLINE)post({t:'finish'});else endGame()};
 function saveLocal(){try{localStorage.setItem('ludoGame',JSON.stringify({players,mode,T,killed,cur,WINN,t:Date.now()}))}catch(e){}}
 function loadLocal(){try{return JSON.parse(localStorage.getItem('ludoGame')||'null')}catch(e){return null}}
@@ -417,13 +428,13 @@ async function pollLoop(g){let fails=0;
       if(!j.more&&!synced){synced=true;if(!qrun&&!MQ.length)FAST=false}
     }catch(e){if(g!==pollGen)return;fails++;onErr('Reconnecting…');await rs(Math.min(700*fails,3000))}}}
 function handle(d){
-  if(d.t==='lobby'){names={};Object.entries(d.seats).forEach(([c,n])=>names[c]=n);me.host=d.host===me.color;lobbySeats=d.seats;lobbyHost=d.host;renderLobby()}
+  if(d.t==='lobby'){names={};Object.entries(d.seats).forEach(([c,n])=>names[c]=n);me.host=d.host===me.color;lobbySeats=d.seats;lobbyHost=d.host;renderLobby();if(started&&phase!=='over')$('#fin').classList.toggle('hide',!me.host)}
   else if(d.t==='presence'){onlineOn=d.on;renderSeats();updSkip()}
   else if(d.t==='synced'){synced=true;if(!qrun&&!MQ.length)FAST=false}
   else if(d.t==='closed'){leaveOnline();onErr('The host closed this room.');$('#win').classList.add('hide');$('#online').classList.remove('hide');$('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide')}
   else if(d.t==='start'){selfMoves=0;WINN=d.win||4;players=d.players;mode={red:'off',green:'off',yellow:'off',blue:'off'};players.forEach(c=>mode[c]='human');started=true;
     MQ.length=0;$('#online').classList.add('hide');$('#setup').classList.add('hide');$('#win').classList.add('hide');newGame()}
-  else if(d.t==='roll'||d.t==='move'||d.t==='skip'||d.t==='finish'){MQ.push(d);if(!qrun)runQ()}}
+  else if(d.t==='roll'||d.t==='move'||d.t==='skip'||d.t==='finish'||d.t==='left'){MQ.push(d);if(!qrun)runQ()}}
 function renderPick(){const b=$('#pick');b.innerHTML='';['red','green','blue','yellow'].forEach(c=>{const x=document.createElement('button');
   const taken=!!lobbySeats[c]&&c!==me.color;x.style.cssText=`background:${HEX[c]};border:3px solid ${c===me.color?'#fff':'transparent'};border-radius:14px;opacity:${taken?.25:1}`;
   x.textContent=c===me.color?'YOU':(taken?'•':'');x.disabled=taken;x.onclick=()=>pickSeat(c);b.appendChild(x)})}
@@ -447,6 +458,10 @@ async function runQ(){qrun=true;
       if(!await until(()=>phase==='move'))continue;const c=players[cur];if(m.c!==c)continue;sentMove=false;
       if(!(m.i>=0&&m.i<4)||stepsList(c,T[c][m.i],roll)===null)continue;await doMove(c,m.i)}
     else if(m.t==='skip'){if(await until(()=>phase==='roll'&&!busy))nextTurn()}
+    else if(m.t==='left'){leftSet.add(m.c);const alive=players.filter(c=>!leftSet.has(c));
+      if(alive.length<=1){await until(()=>phase==='roll'||phase==='move'||phase==='over'||phase==='skip',8000);if(phase!=='over')endGame(alive[0])}
+      else if(players[cur]===m.c){await until(()=>phase==='roll'||phase==='move'||phase==='over',8000);
+        if(players[cur]===m.c&&(phase==='roll'||phase==='move')){tokEl[m.c].forEach(e=>e.classList.remove('can'));nextTurn()}}}
     else if(m.t==='finish'){await until(()=>phase==='roll'||phase==='move'||phase==='over',8000);if(phase!=='over')endGame()}}
   qrun=false;BACKLOG=0;if(synced)FAST=false}
 function updSkip(){const c=players[cur];
@@ -548,7 +563,7 @@ def do_save():
         for code, r in items:
             with r.lock:
                 data[code] = {"seats": dict(r.seats), "names": dict(r.names), "host": r.host,
-                              "started": r.started, "log": list(r.log), "touch": r.touch}
+                              "started": r.started, "log": list(r.log), "touch": r.touch, "left": list(r.left)}
         tmp = ROOMS_FILE + ".tmp"
         with open(tmp, "w") as f:
             json.dump(data, f)
@@ -570,6 +585,7 @@ def load_rooms():
         r = Room(code)
         r.seats, r.names, r.host = d["seats"], d["names"], d["host"]
         r.started, r.log, r.touch = d["started"], d["log"], now
+        r.left = set(d.get("left", []))
         ROOMS[code] = r
 RNG = random.SystemRandom()
 
@@ -586,6 +602,7 @@ class Room:
         self.conns = {}      # client id -> [Queue,...] (open event streams)
         self.lock = threading.RLock()
         self.cond = threading.Condition(self.lock)
+        self.left = set()    # colours of players who quit mid-game
         self.seen = {}       # client id -> last time it polled
         self.touch = time.time()
 
@@ -678,6 +695,8 @@ def api_join(d):
     cid = str(d.get("id") or "")
     with r.lock:
         if cid and cid in r.names:                       # re-join after refresh / reconnect
+            if r.color_of(cid) in r.left:
+                return {"error": "You left this game"}
             return {"id": cid, "color": r.color_of(cid), "room": code}
         if r.started:
             return {"error": "That game has already started"}
@@ -712,6 +731,17 @@ def api_leave(d):
                     del r.seats[col]
                 del r.names[cid]
                 r.append(r.lobby())
+        else:                                   # game running: everyone is told this player left
+            col = r.color_of(cid)
+            if col and col not in r.left:
+                r.left.add(col)
+                if cid == r.host:               # hand "host" to someone still playing
+                    for c, i in r.seats.items():
+                        if c not in r.left:
+                            r.host = i
+                            break
+                    r.append(r.lobby())
+                r.append({"t": "left", "c": col})
     return {"ok": True}
 
 
@@ -1042,7 +1072,7 @@ def main():
                 raise
             port += 1
     print("=" * 56)
-    print(" Glass Ludo - ONLINE edition  (Prepared by Yoginder Singh Negi)")
+    print(" Glass Ludo - ONLINE edition  (Developed by Yoginder Singh Negi)")
     print(f" This computer      : http://localhost:{port}")
     print(f" Same Wi-Fi friends : http://{lan_ip()}:{port}")
     print(" Friends anywhere   : see README_ONLINE.txt (tunnel / free hosting)")
