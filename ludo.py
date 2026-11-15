@@ -14,7 +14,7 @@ Rules
  * Exact number needed to reach the final home.
 """
 import http.server, socketserver, threading, webbrowser, socket
-import json, random, queue, time, os, base64
+import json, random, queue, time, os, base64, hashlib, struct
 from urllib.parse import urlparse, parse_qs
 
 HTML = r"""<!DOCTYPE html>
@@ -89,7 +89,19 @@ input::placeholder{color:#ffffffaa}
 #rc{font-size:40px;font-weight:900;letter-spacing:8px;text-shadow:0 0 14px #ff7ae0}
 #skip{padding:8px 10px;font-size:13px}
 #fin{position:fixed;top:8px;left:8px;z-index:6;padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
-#spd{position:fixed;top:8px;right:8px;z-index:6;padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
+#tools{position:fixed;top:8px;right:8px;z-index:6;display:flex;gap:6px}
+#tools button{padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
+#net{position:fixed;top:10px;left:50%;transform:translateX(-50%);font-size:11px;z-index:6;padding:2px 9px;border-radius:10px;background:rgba(0,0,0,.4)}
+body.lite{animation:none;background:linear-gradient(135deg,#1b0b3a,#0b2a5b,#3a0b4f)}
+body.lite .blob{display:none}
+body.lite .glass,body.lite .ov{backdrop-filter:none;-webkit-backdrop-filter:none}
+body.lite .glass{background:rgba(50,30,110,.6)}
+body.lite #scene,body.lite #cube,body.lite #scene.wait,body.lite #scene.six #cube{filter:none!important}
+body.lite #scene.wait{animation:none}
+body.lite .tk{box-shadow:0 2px 4px #0008}
+body.lite .tk.can{box-shadow:0 0 0 3px #fff}
+body.lite .c,body.lite .yard,body.lite .yi,body.lite #ctr{box-shadow:none}
+body.lite .f{box-shadow:inset 0 0 8px #fff8}
 #pick{display:grid;grid-template:repeat(2,52px)/repeat(2,64px);gap:8px;justify-content:center;margin:6px 0 10px}
 #pick button{padding:0;color:#111;font-weight:800}
 #presets{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0}
@@ -104,7 +116,7 @@ input::placeholder{color:#ffffffaa}
   <button id="skip" class="hide">⏭ Skip</button><button id="snd">🔊</button>
 </div>
 <div id="stamp">✍️ Prepared by Yoginder Singh Negi</div>
-<button id="spd"></button><button id="fin" class="hide">🏁 Finish</button>
+<div id="tools"><button id="lite"></button><button id="spd"></button></div><button id="fin" class="hide">🏁 Finish</button><div id="net" class="hide"></div>
 <div id="toast"></div>
 <div id="setup" class="ov"><div class="glass">
   <h2 style="margin:0 0 2px">🎲 New Game</h2>
@@ -116,6 +128,15 @@ input::placeholder{color:#ffffffaa}
   <div style="font-size:12px;opacity:.8">Tip: with 2 players use opposite corners.</div>
   <button id="go">▶ Start Game</button>
   <div style="margin-top:12px"><button id="goOnline" style="background:linear-gradient(90deg,#2de08a88,#4dabff88);font-size:17px">🌐 Play Online with Friends</button></div>
+</div></div>
+<div id="resume" class="ov hide"><div class="glass" style="width:min(90vw,360px)">
+  <h2 style="margin:0 0 6px">👋 Welcome back</h2>
+  <div id="rsOn" class="hide"><div>🌐 Online game · Room <b id="rsRoom"></b></div>
+    <div class="row"><button id="rsOnGo">▶ Resume</button><button id="rsOnX">✖ Close session</button></div></div>
+  <div id="rsOff" class="hide"><div>🎲 Offline game · <span id="rsInfo"></span></div>
+    <div class="row"><button id="rsOffGo">▶ Resume</button><button id="rsOffX">✖ Close session</button></div></div>
+  <div id="rsErr" style="color:#ffb3c1;min-height:18px;margin:4px 0"></div>
+  <button id="rsNew">🆕 Start a new game</button>
 </div></div>
 <div id="online" class="ov hide"><div class="glass" style="width:min(90vw,360px)">
   <h2 style="margin:0 0 4px">🌐 Play Online</h2>
@@ -232,7 +253,7 @@ function burst(el,n=36,cols=Object.values(HEX)){const r=el.getBoundingClientRect
 
 /* ---------- game state ---------- */
 let mode={red:'human',green:'off',yellow:'cpu',blue:'off'},players=[],T={},killed={},cur=0,roll=0,phase='idle',busy=false,gen=0,sixCount=0,snap=null;
-let ONLINE=false,me={},names={},lastN=0,sentRoll=false,sentMove=false,onlineOn=[],started=false,lobbySeats={},lobbyHost='',es=null,BASE='',pollGen=0,synced=false,WINN=4;
+let ONLINE=false,me={},names={},lastN=0,sentRoll=false,sentMove=false,onlineOn=[],started=false,lobbySeats={},lobbyHost='',es=null,BASE='',pollGen=0,synced=false,WINN=4,ws=null,spinning=false,selfMoves=0;
 function normBase(v){v=(v||'').trim();if(!v)return'';try{return new URL(/^https?:\/\//i.test(v)?v:((/^(\d+\.\d+\.\d+\.\d+|localhost)/.test(v)?'http://':'https://')+v)).origin}catch(e){return''}}
 if(location.protocol==='file:'){try{BASE=normBase(localStorage.getItem('ludoServer'))}catch(e){}}
 const tokEl={};
@@ -251,12 +272,12 @@ $('#go').onclick=()=>{COLORS.forEach(c=>mode[c]=$('#m_'+c).value);players=COLORS
   A();$('#setup').classList.add('hide');newGame()};
 $('#again').onclick=()=>{$('#win').classList.add('hide');$('#setup').classList.remove('hide')};
 
-function newGame(){gen++;phase='idle';$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());
+function newGame(res){gen++;phase='idle';$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());
   T={};killed={};
-  players.forEach(c=>{T[c]=[-1,-1,-1,-1];killed[c]=false;tokEl[c]=[0,1,2,3].map(i=>{const e=document.createElement('div');e.className='tk';
+  players.forEach(c=>{T[c]=res?res.T[c]:[-1,-1,-1,-1];killed[c]=res?!!res.killed[c]:false;tokEl[c]=[0,1,2,3].map(i=>{const e=document.createElement('div');e.className='tk';
     e.style.width=e.style.height=(100/N*.92)+'%';
     e.style.background=`radial-gradient(circle at 35% 30%,#fff,${HEX[c]} 55%,${HEX[c]}aa)`;e.style.color=HEX[c];$('#board').appendChild(e);return e})});
-  cur=0;busy=false;sixCount=0;snap=null;place();startTurn()}
+  cur=res?res.cur:0;busy=false;sixCount=0;snap=null;place();startTurn()}
 
 function coord(c,i,p){if(p<0){const [ox,oy]=YOFF[c];return [SPOT[i][0]+ox,SPOT[i][1]+oy]}
   if(p<HB){const q=PATH[(START[c]+p)%R];return [q[0]+.5,q[1]+.5]}
@@ -272,14 +293,14 @@ const pn=c=>names[c]||NAME[c];
 const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 cut a goti to open home';
 function say(t){const c=players[cur];$('#st').innerHTML=`<b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small>`}
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
-function startTurn(){if(phase==='over')return;phase='roll';busy=false;const c=players[cur];
+function startTurn(){if(phase==='over')return;phase='roll';busy=false;const c=players[cur];if(!ONLINE)saveLocal();
   $('#scene').style.setProperty('--pc',HEX[c]);$('#scene').style.setProperty('--pd',shade(HEX[c],.55));
   const mine=!ONLINE||c===me.color;
   say(mode[c]==='cpu'?'(CPU) rolling…':mine?'tap the dice 🎲':'is playing…');
   $('#scene').classList.remove('six','sad');$('#scene').classList.toggle('wait',mode[c]==='human'&&mine);updSkip();
   if(mode[c]==='cpu'){const g=gen;setTimeout(()=>{if(g===gen)rollDice()},550*SP)}}
 $('#scene').onpointerdown=e=>{e.preventDefault();A();
-  if(ONLINE){if(phase==='roll'&&players[cur]===me.color&&!sentRoll){sentRoll=true;setTimeout(()=>sentRoll=false,6000);post({t:'roll'})}return}
+  if(ONLINE){if(phase==='roll'&&players[cur]===me.color&&!sentRoll){sentRoll=true;startSpin();setTimeout(()=>{sentRoll=false;if(spinning)stopSpin()},6000);post({t:'roll'})}return}
   if(phase==='roll'&&mode[players[cur]]==='human')rollDice()};
 
 /* tap anywhere near a glowing token to move it */
@@ -298,12 +319,15 @@ function choose(c,mv){let best=mv[0],bs=-1;mv.forEach(i=>{const p=T[c][i],l=step
   if(np===FIN_P)s+=100;if(victims(c,np).length)s+=80;if(p<0)s+=(killed[c]?40:50);if(np>=HB)s+=30;
   if(np<HB&&SAFE.has((START[c]+np)%R))s+=12;if(p>=0&&p<HB)s+=(p%R)/8;if(s>bs){bs=s;best=i}});return best}
 
+function startSpin(){spinning=true;const sc=$('#scene');sc.classList.remove('wait','six','sad');sc.classList.add('rolling');sc.style.animationDuration='1.2s';
+  cube.style.transition='transform 1.6s linear';cube.style.transform=`${TILT} rotateX(1440deg) rotateY(1800deg)`;sfxRoll()}
+function stopSpin(){spinning=false;const sc=$('#scene');sc.classList.remove('rolling');sc.style.animationDuration='';cube.style.transition='none';cube.style.transform=`${TILT} rotateX(0deg) rotateY(0deg)`}
 async function rollDice(forced){if(busy||phase!=='roll')return;busy=true;phase='rolling';const g=gen,sc=$('#scene'),c=players[cur];
-  A();sc.classList.remove('wait','six','sad');sc.classList.add('rolling');sc.style.animationDuration=SP+'s';sfxRoll();
+  const was=spinning;spinning=false;A();sc.classList.remove('wait','six','sad');if(!was){sc.classList.add('rolling');sc.style.animationDuration=SP+'s';sfxRoll()}
   roll=forced||(1+Math.floor(Math.random()*6));
   if(roll===6){sixCount++;if(sixCount===1)snap=JSON.stringify({T,killed})}else sixCount=0;
   const [ax,ay]=SHOW[roll];cube.style.transition=`transform ${SP}s cubic-bezier(.2,.8,.2,1)`;
-  cube.style.transform=`${TILT} rotateX(${ax+720+Math.round(Math.random()*2)*360}deg) rotateY(${ay+1080}deg)`;
+  cube.style.transform=`${TILT} rotateX(${ax+(was?1800:720)+Math.round(Math.random()*2)*360}deg) rotateY(${ay+(was?2160:1080)}deg)`;
   await sleep(1050);if(g!==gen)return;
   sc.classList.remove('rolling');sc.style.animationDuration='';cube.style.transition='none';cube.style.transform=`${TILT} rotateX(${ax}deg) rotateY(${ay}deg)`;
   const mv=(roll===6&&sixCount===3)?[]:movable(c),useless=roll===6&&sixCount<3&&!mv.length;
@@ -333,7 +357,7 @@ async function doMove(c,i){if(busy||phase!=='move')return;busy=true;phase='movin
   if(T[c].filter(x=>x===FIN_P).length>=WINN){endGame(c);return}
   if(extra)startTurn();else nextTurn()}
 
-function endGame(w0){phase='over';busy=true;gen++;$('#fin').classList.add('hide');
+function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');
   const prog=c=>T[c].reduce((a,x)=>a+(x<0?0:x<HB?x:LAST+1+(x-HB)),0);
   const rows=players.map(c=>({c,h:T[c].filter(x=>x===FIN_P).length,p:prog(c)})).sort((a,b)=>b.h-a.h||b.p-a.p);
   if(w0){const wi=rows.findIndex(r=>r.c===w0);if(wi>0)rows.unshift(rows.splice(wi,1)[0])}
@@ -344,6 +368,9 @@ function endGame(w0){phase='over';busy=true;gen++;$('#fin').classList.add('hide'
     const rr=document.createElement('span');rr.textContent=r.h+' home';d.append(l,rr);box.appendChild(d)});
   $('#win').classList.remove('hide');for(let k=0;k<5;k++)setTimeout(()=>burst($('#wt'),50),k*300)}
 $('#fin').onclick=()=>{if(phase==='over')return;if(!confirm('Finish the game now and show the result?'))return;if(ONLINE)post({t:'finish'});else endGame()};
+function saveLocal(){try{localStorage.setItem('ludoGame',JSON.stringify({players,mode,T,killed,cur,WINN,t:Date.now()}))}catch(e){}}
+function loadLocal(){try{return JSON.parse(localStorage.getItem('ludoGame')||'null')}catch(e){return null}}
+function clearLocal(){try{localStorage.removeItem('ludoGame')}catch(e){}}
 function nextTurn(){sixCount=0;snap=null;cur=(cur+1)%players.length;startTurn()}
 
 /* ================= ONLINE MULTIPLAYER ================= */
@@ -351,16 +378,33 @@ const store=()=>{try{return JSON.parse(localStorage.getItem('ludoSess')||'null')
 const MQ=[];let qrun=false;
 async function api(path,body){try{const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
   if(j.error==='not found')j.error='Wrong server address - use only the main game link (nothing after .com)';return j}catch(e){return{error:'Cannot reach the game server - check internet / server address'}}}
-function post(msg){return fetch(BASE+'/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:me.room,id:me.id,msg})}).catch(()=>{})}
-function sendMove(i){if(sentMove)return;sentMove=true;setTimeout(()=>sentMove=false,6000);post({t:'move',i})}
+function post(msg){if(ws&&ws.readyState===1){try{ws.send(JSON.stringify(msg));return Promise.resolve()}catch(e){}}return postHTTP(msg)}
+async function postHTTP(msg,tries=3){for(let i=0;i<tries;i++){
+    try{const r=await fetch(BASE+'/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:me.room,id:me.id,msg})});if(r.ok)return}catch(e){}
+    await rs(500*(i+1))}
+  toast('⚠ Connection problem - resyncing');if(msg.t==='move'){try{sessionStorage.setItem('autoResume','1')}catch(e){}setTimeout(()=>location.reload(),1200)}}
+function sendMove(i){if(sentMove||phase!=='move')return;sentMove=true;setTimeout(()=>sentMove=false,6000);selfMoves++;post({t:'move',i});doMove(me.color,i)}   // moves instantly on your screen
 const onErr=t=>{$('#onErr').textContent=t||''};
 const inviteUrl=()=>`${BASE||location.origin}/?room=${me.room}`;
 function enter(res){if(res.error){onErr(res.error);return}
   ONLINE=true;me={id:res.id,color:res.color,room:res.room,host:false};lastN=0;started=false;names={};
   try{localStorage.setItem('ludoSess',JSON.stringify({room:me.room,id:me.id,name:$('#pname').value.trim()}))}catch(e){}
   $('#onJoin').classList.add('hide');$('#onLobby').classList.remove('hide');$('#rc').textContent=me.room;connect()}
-function connect(){pollGen++;synced=false;FAST=true;pollLoop(pollGen)}
+function connect(){pollGen++;synced=false;FAST=true;openWS(pollGen);pingLoop(pollGen)}
+function openWS(g){let opened=false,w;
+  try{w=new WebSocket(`${(BASE||location.origin).replace(/^http/,'ws')}/ws?room=${me.room}&id=${me.id}&after=${lastN}`)}catch(e){ws=null;pollLoop(g);return}
+  ws=w;
+  const fb=setTimeout(()=>{if(!opened&&g===pollGen){try{w.close()}catch(e){}ws=null;pollLoop(g)}},4500);   // WebSocket blocked -> use long-poll instead
+  w.onopen=()=>{opened=true;clearTimeout(fb);onErr('')};
+  w.onmessage=e=>{const d=JSON.parse(e.data);if(d.n){if(d.n<=lastN)return;lastN=d.n}handle(d)};
+  w.onclose=()=>{clearTimeout(fb);if(g!==pollGen||!ONLINE||ws!==w)return;ws=null;if(opened){onErr('Reconnecting…');setTimeout(()=>{if(g===pollGen&&ONLINE)openWS(g)},600)}}}
 const rs=ms=>new Promise(r=>setTimeout(r,ms));
+async function pingLoop(g){
+  while(g===pollGen&&ONLINE){const t=performance.now(),e=$('#net');
+    try{await fetch(BASE+'/health',{cache:'no-store'});const ms=Math.round(performance.now()-t);e.classList.remove('hide');e.textContent=(ms<150?'🟢 ':ms<400?'🟡 ':'🔴 ')+ms+' ms'}
+    catch(x){e.classList.remove('hide');e.textContent='🔴 offline'}
+    await rs(6000)}
+  $('#net').classList.add('hide')}
 async function pollLoop(g){let fails=0;
   while(g===pollGen&&ONLINE){
     try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),32000);
@@ -375,8 +419,9 @@ async function pollLoop(g){let fails=0;
 function handle(d){
   if(d.t==='lobby'){names={};Object.entries(d.seats).forEach(([c,n])=>names[c]=n);me.host=d.host===me.color;lobbySeats=d.seats;lobbyHost=d.host;renderLobby()}
   else if(d.t==='presence'){onlineOn=d.on;renderSeats();updSkip()}
-  else if(d.t==='synced'){FAST=false}
-  else if(d.t==='start'){WINN=d.win||4;players=d.players;mode={red:'off',green:'off',yellow:'off',blue:'off'};players.forEach(c=>mode[c]='human');started=true;
+  else if(d.t==='synced'){synced=true;if(!qrun&&!MQ.length)FAST=false}
+  else if(d.t==='closed'){leaveOnline();onErr('The host closed this room.');$('#win').classList.add('hide');$('#online').classList.remove('hide');$('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide')}
+  else if(d.t==='start'){selfMoves=0;WINN=d.win||4;players=d.players;mode={red:'off',green:'off',yellow:'off',blue:'off'};players.forEach(c=>mode[c]='human');started=true;
     MQ.length=0;$('#online').classList.add('hide');$('#setup').classList.add('hide');$('#win').classList.add('hide');newGame()}
   else if(d.t==='roll'||d.t==='move'||d.t==='skip'||d.t==='finish'){MQ.push(d);if(!qrun)runQ()}}
 function renderPick(){const b=$('#pick');b.innerHTML='';['red','green','blue','yellow'].forEach(c=>{const x=document.createElement('button');
@@ -398,7 +443,8 @@ async function until(f,ms=12000){const t=Date.now();while(!f()){if(Date.now()-t>
 async function runQ(){qrun=true;
   while(MQ.length){BACKLOG=MQ.length;const m=MQ.shift();
     if(m.t==='roll'){if(!await until(()=>phase==='roll'&&!busy))continue;if(m.c!==players[cur])continue;sentRoll=false;await rollDice(m.v)}
-    else if(m.t==='move'){if(!await until(()=>phase==='move'))continue;const c=players[cur];if(m.c!==c)continue;sentMove=false;
+    else if(m.t==='move'){if(m.c===me.color&&selfMoves>0){selfMoves--;sentMove=false;continue}
+      if(!await until(()=>phase==='move'))continue;const c=players[cur];if(m.c!==c)continue;sentMove=false;
       if(!(m.i>=0&&m.i<4)||stepsList(c,T[c][m.i],roll)===null)continue;await doMove(c,m.i)}
     else if(m.t==='skip'){if(await until(()=>phase==='roll'&&!busy))nextTurn()}
     else if(m.t==='finish'){await until(()=>phase==='roll'||phase==='move'||phase==='over',8000);if(phase!=='over')endGame()}}
@@ -411,7 +457,13 @@ function setSP(v){SP=v;document.documentElement.style.setProperty('--tt',(.14*SP
   const m=SPEEDS.find(x=>x[0]===v)||SPEEDS[1];$('#spd').textContent=m[1]}
 $('#spd').onpointerdown=e=>{e.preventDefault();const i=SPEEDS.findIndex(x=>x[0]===SP);setSP(SPEEDS[(i+1)%SPEEDS.length][0])};
 setSP(SPEEDS.some(x=>x[0]===SP)?SP:.5);
-function leaveOnline(){pollGen++;if(es)es.close();es=null;ONLINE=false;FAST=false;names={};started=false;onlineOn=[];lobbySeats={};try{localStorage.removeItem('ludoSess')}catch(e){}}
+let LITE=null;try{LITE=localStorage.getItem('ludoLite')}catch(e){}
+function setLite(on,save){document.body.classList.toggle('lite',on);$('#lite').textContent=on?'🪶 Lite':'✨ Full';if(save){try{localStorage.setItem('ludoLite',on?'1':'0')}catch(e){}}}
+$('#lite').onpointerdown=e=>{e.preventDefault();setLite(!document.body.classList.contains('lite'),true)};
+if(LITE==='1')setLite(true);else if(LITE==='0')setLite(false);
+else{setLite((navigator.hardwareConcurrency||8)<=4);   // slow phones: switch effects off automatically
+  let fr=0;const t0=performance.now();(function f(){fr++;const dt=performance.now()-t0;if(dt<1500)requestAnimationFrame(f);else if(fr/(dt/1000)<40)setLite(true)})()}
+function leaveOnline(){pollGen++;if(ws){try{ws.close()}catch(e){}}ws=null;selfMoves=0;if(es)es.close();es=null;ONLINE=false;FAST=false;names={};started=false;onlineOn=[];lobbySeats={};try{localStorage.removeItem('ludoSess')}catch(e){}}
 $('#again').addEventListener('click',()=>{leaveOnline();$('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide')});
 function askServer(){const v=prompt('Enter your game server address, e.g. https://your-name.onrender.com');if(!v)return false;
   const b=normBase(v);if(!b){alert('That address does not look right');return false}BASE=b;try{localStorage.setItem('ludoServer',BASE)}catch(e){}return true}
@@ -431,7 +483,23 @@ $('#shareBtn').onclick=async()=>{const url=inviteUrl(),txt=`Join my Ludo game! R
   if(navigator.share){try{await navigator.share({title:'Glass Ludo',text:txt,url});return}catch(e){}}
   window.open('https://wa.me/?text='+encodeURIComponent(txt+' '+url),'_blank')};
 $('#copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(inviteUrl());$('#lobMsg').textContent='Link copied ✔'}catch(e){prompt('Copy this invite link',inviteUrl())}};
-(function(){const q=(new URLSearchParams(location.search).get('room')||'').toUpperCase();if(!q)return;const s=store();
+function refreshResume(){const s=store(),g=loadLocal();$('#rsOn').classList.toggle('hide',!s);$('#rsOff').classList.toggle('hide',!g);
+  if(s)$('#rsRoom').textContent=s.room;if(g)$('#rsInfo').textContent=g.players.map(c=>NAME[c]).join(', ');
+  if(!s&&!g){$('#resume').classList.add('hide');$('#setup').classList.remove('hide')}}
+function showResume(){if(!store()&&!loadLocal())return false;$('#setup').classList.add('hide');$('#resume').classList.remove('hide');refreshResume();return true}
+async function resumeOnline(){const s=store();if(!s)return;$('#rsErr').textContent='Connecting…';
+  const res=await api('/api/join',{name:s.name||'Player',room:s.room,id:s.id});
+  if(res.error){$('#rsErr').textContent='That online game is no longer available.';try{localStorage.removeItem('ludoSess')}catch(e){}refreshResume();return}
+  $('#rsErr').textContent='';$('#resume').classList.add('hide');$('#online').classList.remove('hide');$('#pname').value=s.name||'';enter(res)}
+function resumeOffline(){const g=loadLocal();if(!g)return;players=g.players;mode=g.mode;WINN=g.WINN||4;$('#resume').classList.add('hide');$('#setup').classList.add('hide');A();newGame(g)}
+$('#rsOnGo').onclick=resumeOnline;
+$('#rsOnX').onclick=async()=>{const s=store();if(s)await api('/api/leave',{room:s.room,id:s.id});try{localStorage.removeItem('ludoSess')}catch(e){}$('#rsErr').textContent='';refreshResume()};
+$('#rsOffGo').onclick=resumeOffline;
+$('#rsOffX').onclick=()=>{clearLocal();refreshResume()};
+$('#rsNew').onclick=()=>{$('#resume').classList.add('hide');$('#setup').classList.remove('hide')};
+(function(){const q=(new URLSearchParams(location.search).get('room')||'').toUpperCase();
+  if(!q){if(sessionStorage.getItem('autoResume')==='1'){sessionStorage.removeItem('autoResume');if(store()){showResume();resumeOnline();return}}showResume();return}
+  const s=store();
   $('#setup').classList.add('hide');$('#online').classList.remove('hide');$('#rcode').value=q;$('#pname').value=(s&&s.name)||'';
   if(s&&s.room===q&&s.id&&s.name)api('/api/join',{name:s.name,room:q,id:s.id}).then(enter)})();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('/sw.js').catch(()=>{});
@@ -456,6 +524,53 @@ COLORS = ["red", "green", "yellow", "blue"]
 CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 ROOMS = {}
 ROOMS_LOCK = threading.Lock()
+WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+ROOMS_FILE = os.environ.get("ROOMS_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "ludo_rooms.json"))
+_save_pending = False
+
+
+def schedule_save():
+    """Save rooms to disk shortly after a change, so games survive a server restart (where the disk is kept)."""
+    global _save_pending
+    if _save_pending:
+        return
+    _save_pending = True
+    threading.Timer(1.5, do_save).start()
+
+
+def do_save():
+    global _save_pending
+    _save_pending = False
+    try:
+        with ROOMS_LOCK:
+            items = list(ROOMS.items())
+        data = {}
+        for code, r in items:
+            with r.lock:
+                data[code] = {"seats": dict(r.seats), "names": dict(r.names), "host": r.host,
+                              "started": r.started, "log": list(r.log), "touch": r.touch}
+        tmp = ROOMS_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, ROOMS_FILE)
+    except Exception:
+        pass
+
+
+def load_rooms():
+    try:
+        with open(ROOMS_FILE) as f:
+            data = json.load(f)
+    except Exception:
+        return
+    now = time.time()
+    for code, d in data.items():
+        if now - d.get("touch", 0) > 6 * 3600:
+            continue
+        r = Room(code)
+        r.seats, r.names, r.host = d["seats"], d["names"], d["host"]
+        r.started, r.log, r.touch = d["started"], d["log"], now
+        ROOMS[code] = r
 RNG = random.SystemRandom()
 
 
@@ -485,6 +600,7 @@ class Room:
             msg["n"] = len(self.log) + 1
             self.log.append(msg)
             self.cond.notify_all()
+            schedule_save()
             for qs in self.conns.values():
                 for q in qs:
                     q.put((msg["n"], msg))
@@ -498,7 +614,7 @@ class Room:
 
     def online_colors(self):
         now = time.time()
-        return [c for c, i in self.seats.items() if now - self.seen.get(i, 0) < 35]
+        return [c for c, i in self.seats.items() if i in self.conns or now - self.seen.get(i, 0) < 35]
 
     def lobby(self):
         return {"t": "lobby", "seats": {c: self.names[i] for c, i in self.seats.items()},
@@ -506,7 +622,7 @@ class Room:
 
     def presence(self):
         with self.lock:
-            on = [c for c, i in self.seats.items() if i in self.conns]
+            on = self.online_colors()
         self.transient({"t": "presence", "on": on})
 
 
@@ -574,6 +690,29 @@ def api_join(d):
         r.names[cid] = clean_name(d.get("name"))
         r.append(r.lobby())
     return {"id": cid, "color": col, "room": code}
+
+
+def api_leave(d):
+    """Close this device's session. Before the game starts the seat is freed (host leaving closes the room)."""
+    code = str(d.get("room", "")).strip().upper()
+    r = ROOMS.get(code)
+    cid = str(d.get("id") or "")
+    if not r or cid not in r.names:
+        return {"ok": True}
+    with r.lock:
+        if not r.started:
+            if cid == r.host:
+                r.append({"t": "closed"})
+                with ROOMS_LOCK:
+                    ROOMS.pop(code, None)
+                schedule_save()
+            else:
+                col = r.color_of(cid)
+                if col:
+                    del r.seats[col]
+                del r.names[cid]
+                r.append(r.lobby())
+    return {"ok": True}
 
 
 def api_send(d):
@@ -658,6 +797,8 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(200, ICON512, "image/png")
         if p == "/health":
             return self._send(200, "ok", "text/plain")
+        if p == "/ws":
+            return self.ws(parse_qs(u.query))
         if p == "/api/poll":
             return self.poll(parse_qs(u.query))
         if p == "/api/events":
@@ -670,10 +811,132 @@ class H(http.server.BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(min(n, 20000)) or b"{}")
         except Exception:
             return self._send(400, '{"error":"bad request"}')
-        fn = {"/api/create": api_create, "/api/join": api_join, "/api/send": api_send}.get(urlparse(self.path).path.rstrip("/"))
+        fn = {"/api/create": api_create, "/api/join": api_join, "/api/send": api_send, "/api/leave": api_leave}.get(urlparse(self.path).path.rstrip("/"))
         if not fn:
             return self._send(404, '{"error":"not found"}')
         self._send(200, json.dumps(fn(data)))
+
+    def ws_read(self):
+        """Read one WebSocket message (text/control frame) from the client."""
+        f = self.rfile
+
+        def need(n):
+            b = f.read(n)
+            if b is None or len(b) < n:
+                raise OSError("closed")
+            return b
+        data, op0 = b"", None
+        while True:
+            b1, b2 = need(2)
+            fin, op, masked, n = b1 & 0x80, b1 & 0x0F, b2 & 0x80, b2 & 0x7F
+            if n == 126:
+                n = struct.unpack(">H", need(2))[0]
+            elif n == 127:
+                n = struct.unpack(">Q", need(8))[0]
+            if n > 65536:
+                raise ValueError("frame too big")
+            mask = need(4) if masked else b""
+            payload = need(n)
+            if masked:
+                payload = bytes(c ^ mask[i % 4] for i, c in enumerate(payload))
+            if op >= 8:
+                return op, payload
+            if op0 is None:
+                op0 = op
+            data += payload
+            if fin:
+                return op0, data
+
+    def ws(self, q):
+        """WebSocket: one always-open connection, messages pushed instantly both ways."""
+        r = ROOMS.get(q.get("room", [""])[0].upper())
+        cid = q.get("id", [""])[0]
+        key = self.headers.get("Sec-WebSocket-Key")
+        if not r or cid not in r.names or not key:
+            return self._send(404, '{"error":"unknown room"}')
+        try:
+            after = max(0, int(q.get("after", ["0"])[0]))
+        except ValueError:
+            after = 0
+        accept = base64.b64encode(hashlib.sha1((key + WS_GUID).encode()).digest()).decode()
+        self.send_response(101)
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Connection", "Upgrade")
+        self.send_header("Sec-WebSocket-Accept", accept)
+        self.end_headers()
+        self.close_connection = True
+        sock = self.connection
+        sock.settimeout(75)
+        slock, qu, alive = threading.Lock(), queue.Queue(), threading.Event()
+        alive.set()
+
+        def send(op, payload=b""):
+            if isinstance(payload, str):
+                payload = payload.encode("utf-8")
+            n = len(payload)
+            head = bytes([0x80 | op])
+            if n < 126:
+                head += bytes([n])
+            elif n < 65536:
+                head += bytes([126]) + struct.pack(">H", n)
+            else:
+                head += bytes([127]) + struct.pack(">Q", n)
+            with slock:
+                sock.sendall(head + payload)
+
+        with r.lock:
+            for m in r.log[after:]:
+                qu.put((m["n"], m))
+            qu.put((None, {"t": "synced"}))
+            r.conns.setdefault(cid, []).append(qu)
+            r.seen[cid] = time.time()
+        r.presence()
+
+        def writer():
+            try:
+                while alive.is_set():
+                    try:
+                        item = qu.get(timeout=20)
+                    except queue.Empty:
+                        send(9)                    # keep-alive ping
+                        continue
+                    if item is None:
+                        break
+                    send(1, json.dumps(item[1]))
+            except OSError:
+                pass
+            finally:
+                alive.clear()
+        threading.Thread(target=writer, daemon=True).start()
+        try:
+            while alive.is_set():
+                op, payload = self.ws_read()
+                if op == 8:
+                    break
+                if op == 9:
+                    send(10, payload)
+                elif op == 1:
+                    try:
+                        msg = json.loads(payload.decode("utf-8"))
+                    except Exception:
+                        continue
+                    if isinstance(msg, dict):
+                        api_send({"room": r.code, "id": cid, "msg": msg})
+        except (OSError, ValueError):
+            pass
+        finally:
+            alive.clear()
+            qu.put(None)
+            with r.lock:
+                if cid in r.conns and qu in r.conns[cid]:
+                    r.conns[cid].remove(qu)
+                    if not r.conns[cid]:
+                        del r.conns[cid]
+            r.presence()
+            try:
+                send(8)
+            except OSError:
+                pass
 
     def poll(self, q):
         """Long-poll: wait (up to 20s) until there is a new message, then answer immediately."""
@@ -767,6 +1030,7 @@ def lan_ip():
 
 
 def main():
+    load_rooms()
     hosted = "PORT" in os.environ            # cloud hosts give a PORT
     port = int(os.environ.get("PORT", 8000))
     while True:

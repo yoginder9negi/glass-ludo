@@ -37,3 +37,24 @@ C) ALWAYS-ON FREE HOSTING (e.g. Render.com) - no PC needed
 INSTALL AS AN APP: open the hosted https link in Chrome on Android > menu > "Add to Home screen".
 
 GAME OPTIONS: choose how many goti must reach home to win (1-4); press 🏁 Finish to end a game early (online: host only).
+
+RESUME / CLOSE SESSION
+ If the app or browser closes by accident, just open the game again: a "Welcome back" screen offers
+ "Resume" (offline game or online room) or "Close session" to discard it. Online, your seat is kept, so you
+ rejoin as the same player and the game replays instantly. Closing the session before the game starts frees
+ your seat (if the host closes, the room closes).
+ Rooms are saved to ludo_rooms.json next to ludo.py, so on a PC/VPS they even survive a server restart
+ (free cloud hosts with a temporary disk lose them on restart).
+
+LOWEST LATENCY (REAL TIME)
+ - Game now uses WebSockets (one always-open connection) and your own taps react instantly (dice spins, token moves)
+   without waiting for the server.
+ - The biggest factor is DISTANCE to the server. Best: a small server in your country.
+   Example for India: a VPS in Mumbai/Bangalore (AWS Lightsail Mumbai, DigitalOcean Bangalore, Oracle Cloud Mumbai free tier).
+     1. Install Python 3, copy ludo.py to the server, run:  PORT=8000 python3 ludo.py
+        (keep it running with:  nohup python3 ludo.py &   or a systemd service)
+     2. Open port 8000 in the provider's firewall, share  http://SERVER-IP:8000
+        For https (needed for Add-to-Home-screen / install): run on the server
+        cloudflared tunnel --url http://localhost:8000   and share the https link it prints.
+ - Next best: Render with Region = Singapore. Avoid far regions (USA/Europe).
+ - Watch the 🟢 ms badge at the top of the screen: under 150 ms feels real time.
