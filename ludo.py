@@ -123,6 +123,31 @@ body.lite .f{box-shadow:inset 0 0 8px #fff8}
 #pick button{padding:0;color:#111;font-weight:800}
 #presets{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0}
 #presets button{padding:6px 10px;font-size:12px}
+
+/* --- dhol boy that appears when a goti leaves the yard --- */
+.dm{position:absolute;z-index:13;pointer-events:none;transform:translate(-50%,-50%) scale(0);opacity:0;transition:transform .5s cubic-bezier(.2,1.6,.4,1),opacity .3s}
+.dm.show{transform:translate(-50%,-50%) scale(1);opacity:1}
+.dm svg{width:100%;height:auto;display:block;overflow:visible;filter:drop-shadow(0 3px 4px #0009)}
+.dm:not(.show) svg *{animation-play-state:paused}
+body.lite .dm svg{filter:none}
+.dm-bd{animation:dmbob .26s ease-in-out infinite alternate}
+@keyframes dmbob{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+.dm-l{transform-origin:44px 128px;animation:dml .26s ease-in-out infinite alternate}
+.dm-r{transform-origin:152px 112px;animation:dml .26s ease-in-out infinite alternate-reverse}
+@keyframes dml{from{transform:rotate(-16deg)}to{transform:rotate(12deg)}}
+.dm-hd{transform-origin:98px 108px;animation:dmhd .52s ease-in-out infinite alternate}
+@keyframes dmhd{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+.dm-tf{transform-origin:112px 36px;animation:dmtf .26s ease-in-out infinite alternate}
+@keyframes dmtf{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
+.dm-mo{transform-origin:97px 97px;animation:dmmo .26s ease-in-out infinite alternate}
+@keyframes dmmo{from{transform:scaleY(.55)}to{transform:scaleY(1)}}
+.dm-ey{transform-origin:97px 82px;animation:dmey 2.1s infinite}
+@keyframes dmey{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.dm-dr{transform-origin:110px 172px;animation:dmdr .26s ease-in-out infinite alternate}
+@keyframes dmdr{from{transform:scale(1)}to{transform:scale(1.035)}}
+.dm-ts{animation:dmts .52s ease-in-out infinite alternate}
+.dm-ts:nth-of-type(2n){animation-direction:alternate-reverse}
+@keyframes dmts{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
 </style></head><body>
 <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div>
 <h1>✨ GLASS LUDO ✨</h1>
@@ -319,30 +344,128 @@ function sfxShehnai(){if(muted||FAST)return;const a=A(),t=now();
 /* --- cartoons --- */
 function showToon(id,ms){if(FAST)return;const e=$('#'+id);e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),ms)}
 const HAMMER_SVG='<svg viewBox="0 0 100 100" width="100%" height="100%"><rect x="45" y="22" width="10" height="72" rx="4" fill="#b5651d" stroke="#6b3a10" stroke-width="2"/><rect x="18" y="6" width="64" height="30" rx="8" fill="#e63946" stroke="#7a1010" stroke-width="2"/><rect x="24" y="10" width="52" height="6" rx="3" fill="#fff" opacity="0.4"/><rect x="18" y="6" width="9" height="30" rx="4" fill="#ffd23f"/><rect x="73" y="6" width="9" height="30" rx="4" fill="#ffd23f"/><circle cx="42" cy="23" r="3.6" fill="#fff"/><circle cx="58" cy="23" r="3.6" fill="#fff"/><circle cx="43" cy="24" r="1.8" fill="#111"/><circle cx="59" cy="24" r="1.8" fill="#111"/><path d="M36 15 L47 19 M64 15 L53 19" stroke="#111" stroke-width="2.5" stroke-linecap="round"/></svg>';
-async function hammerHit(c,i,v,onHit,after){
-  if(FAST){onHit&&onHit();after&&after();return}
-  const bd=$('#board'),br=bd.getBoundingClientRect(),kel=tokEl[c][i],vs=v.map(([o,j])=>tokEl[o][j]);
-  await rs(90);
+/* ===== SLOW-MOTION HAMMER =====
+   KILL_SLOW: 1 = old speed, bigger = slower.  2.0 = clear slow motion.  Change this one number to tune. */
+const KILL_SLOW=2.0;
+function sfxThud(){if(muted||FAST)return;const t=now();tone('sine',210,70,t,.16,.45,420);noise(t,.05,.25,900)}
+/* the hammer (= the killer goti) hops square by square along its path, lands on the victim's square,
+   hops beside it, winds up slowly and smashes it. trail = [[x,y],...] board-cell coordinates of the squares crossed. */
+async function hammerHit(c,i,v,onHit,after,trail){
+  if(FAST||!trail||trail.length<2){onHit&&onHit();after&&after();return}
+  const bd=$('#board'),br=bd.getBoundingClientRect(),W=br.width,cs=W/N,kel=tokEl[c][i],vs=v.map(([o,j])=>tokEl[o][j]),K=ms=>ms*KILL_SLOW;
   const ctr=el=>{const r=el.getBoundingClientRect();return[r.left+r.width/2-br.left,r.top+r.height/2-br.top,r.width]};
-  const [vx,vy,sz]=ctr(vs[0]),S=sz*2.8,R=.76*S,d=Math.max(.4,SP)*1000;
-  const h=document.createElement('div');
-  h.style.cssText=`position:absolute;z-index:12;pointer-events:none;width:${S}px;height:${S}px;left:${vx+R-S/2}px;top:${vy-.94*S}px;transform-origin:50% 94%;opacity:0`;
-  h.innerHTML=HAMMER_SVG;bd.appendChild(h);
-  const ghosts=vs.map(el=>{const [x,y,w]=ctr(el),gh=document.createElement('div');
-    gh.style.cssText=`position:absolute;z-index:11;border-radius:50%;pointer-events:none;border:2px solid #fff;width:${w}px;height:${w}px;left:${x}px;top:${y}px;background:${el.style.background};box-shadow:0 3px 6px #0007;transform:translate(-50%,-50%)`;
+  const [vx,vy,sz]=ctr(vs[0]),S=sz*2.8,R=.76*S;
+  const dir=(br.left+vx+1.45*S<=innerWidth)?1:-1;            /* strike from the right side unless the screen edge is too near */
+  const pts=trail.map(p=>[p[0]*cs,p[1]*cs]),strike=[vx+dir*R,vy];
+  /* effects layer above the board, so the hammer is never clipped at the board edge */
+  const fx=document.createElement('div');fx.style.cssText=`position:fixed;left:${br.left}px;top:${br.top}px;width:${W}px;height:${W}px;z-index:27;pointer-events:none;overflow:visible`;
+  const w=document.createElement('div');w.style.cssText='position:absolute;left:0;top:0;width:0;height:0;will-change:transform';
+  const h=document.createElement('div');h.style.cssText=`position:absolute;width:${S}px;height:${S}px;left:${-S/2}px;top:${-.94*S}px;transform-origin:50% 94%`;
+  const sq=document.createElement('div');sq.style.cssText='width:100%;height:100%;transform-origin:50% 94%';sq.innerHTML=HAMMER_SVG;
+  h.appendChild(sq);w.appendChild(h);fx.appendChild(w);document.body.appendChild(fx);
+  const at=p=>`translate(${p[0]}px,${p[1]}px)`,rot=a=>`rotate(${a*dir}deg)`;
+  w.style.transform=at(pts[0]);
+  const ghosts=vs.map(el=>{const [x,y,gw]=ctr(el),gh=document.createElement('div');
+    gh.style.cssText=`position:absolute;z-index:11;border-radius:50%;pointer-events:none;border:2px solid #fff;width:${gw}px;height:${gw}px;left:${x}px;top:${y}px;background:${el.style.background};box-shadow:0 3px 6px #0007;transform:translate(-50%,-50%)`;
     bd.appendChild(gh);el.style.visibility='hidden';return gh});
-  kel.style.visibility='hidden';                       /* the killer token turns into the hammer */
-  h.animate([{transform:'rotate(55deg)',opacity:0},{transform:'rotate(32deg)',opacity:1,offset:.28},{transform:'rotate(-90deg)',opacity:1,offset:.55},
-    {transform:'rotate(-90deg)',opacity:1,offset:.85},{transform:'rotate(-90deg)',opacity:0}],{duration:d*1.7,easing:'ease-in-out',fill:'forwards'});
-  await rs(d*1.7*.55);
-  onHit&&onHit();
-  bd.animate([{transform:'translate(0,0)'},{transform:'translate(-6px,4px)'},{transform:'translate(6px,-4px)'},{transform:'translate(-4px,2px)'},{transform:'translate(0,0)'}],{duration:280});
+  kel.style.visibility='hidden';                              /* the killer goti turns into the hammer */
+  /* 1) hammer pops out of the goti */
+  sq.animate([{transform:'scale(.2)',opacity:0},{transform:'scale(1.15)',opacity:1,offset:.6},{transform:'scale(1)',opacity:1}],{duration:K(160),easing:'ease-out',fill:'forwards'});
+  await rs(K(170));
+  /* 2) hop square by square until it stands on the victim's square */
+  const hop=async(a,b,dur,arc)=>{
+    w.animate([{transform:at(a),easing:'ease-out'},{transform:`translate(${(a[0]+b[0])/2}px,${(a[1]+b[1])/2-arc}px)`,offset:.5,easing:'ease-in'},{transform:at(b)}],{duration:dur,fill:'forwards'});
+    sq.animate([{transform:'scale(1,1)'},{transform:'scale(.9,1.12)',offset:.5},{transform:'scale(1,1)'}],{duration:dur});
+    await rs(dur);w.style.transform=at(b);sfxTick();sfxThud();
+    sq.animate([{transform:'scale(1.14,.84)'},{transform:'scale(1,1)'}],{duration:K(110)})};
+  for(let k=1;k<pts.length;k++){await hop(pts[k-1],pts[k],K(200),cs*1.1)}
+  /* 3) last little hop beside the victim, to take the striking position */
+  await rs(K(90));
+  await hop(pts[pts.length-1],strike,K(240),cs*.9);
+  await rs(K(120));
+  /* 4) slow wind-up, tense pause, slow smash */
+  h.animate([{transform:rot(0)},{transform:rot(62),offset:.3,easing:'ease-in-out'},{transform:rot(62),offset:.5,easing:'ease-in'},{transform:rot(-90)}],{duration:K(1000),fill:'forwards'});
+  await rs(K(1000));
+  /* 5) impact, in slow motion */
+  onHit&&onHit();sfxThud();
+  const sh=dir*6;
+  bd.animate([{transform:'translate(0,0)'},{transform:`translate(${-sh}px,4px)`},{transform:`translate(${sh}px,-4px)`},{transform:`translate(${-sh*.6}px,2px)`},{transform:'translate(0,0)'}],{duration:K(300)});
   burst(ghosts[0],26,['#fff','#ffd23f','#ff4d6d']);
-  ghosts.forEach(gh=>gh.animate([{transform:'translate(-50%,-50%) scale(1,1)'},{transform:'translate(-50%,-30%) scale(1.6,.18)',offset:.2},
-    {transform:'translate(-50%,-30%) scale(1.6,.18)',offset:.5},{transform:'translate(-50%,-260%) scale(.2) rotate(500deg)',opacity:0}],{duration:d*1.2,fill:'forwards'}));
-  await rs(d*.9);
+  h.animate([{transform:rot(-90)},{transform:rot(-72),offset:.4},{transform:rot(-90)}],{duration:K(300),delay:K(40)});
+  const gd=K(800);
+  ghosts.forEach(gh=>gh.animate([{transform:'translate(-50%,-50%) scale(1,1)'},{transform:'translate(-50%,-30%) scale(1.6,.18)',offset:.25},
+    {transform:'translate(-50%,-30%) scale(1.6,.18)',offset:.6},{transform:'translate(-50%,-260%) scale(.2) rotate(500deg)',opacity:0}],{duration:gd,fill:'forwards'}));
+  w.animate([{opacity:1},{opacity:1,offset:.55},{opacity:0}],{duration:gd,fill:'forwards'});
+  await rs(gd*.95);
   ghosts.forEach(gh=>gh.remove());after&&after();vs.forEach(el=>el.style.visibility='');kel.style.visibility='';
-  await rs(d*.35);h.remove()}
+  await rs(K(60));fx.remove()}
+
+/* ===== cartoon dhol boy: appears in the goti's yard whenever a goti comes out of it ===== */
+const DHOL_CELLS=2.3,DHOL_MS=2800;       /* size in board squares (keep it small) / how long he plays */
+const DHOL_SVG=`<svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+<g stroke-linejoin="round" stroke-linecap="round">
+<path d="M70 168 L62 214 Q80 222 98 214 L102 175Z" fill="#ffa81f" stroke="#c46a00" stroke-width="2"/>
+<path d="M110 172 L112 214 Q130 222 146 214 L142 170Z" fill="#ffa81f" stroke="#c46a00" stroke-width="2"/>
+<path d="M62 212 Q80 220 98 212 M112 212 Q130 220 146 212" stroke="#e8480c" stroke-width="4" fill="none"/>
+<path d="M56 216 Q80 210 100 218 Q104 231 80 231 Q56 233 56 216Z" fill="#7a3414" stroke="#4a1e08" stroke-width="2"/>
+<path d="M108 218 Q128 210 150 216 Q166 224 150 231 Q120 233 108 218Z" fill="#7a3414" stroke="#4a1e08" stroke-width="2"/>
+<g class="dm-bd">
+<path d="M64 112 Q96 100 128 112 L142 180 Q96 192 54 180Z" fill="#ffa81f" stroke="#c46a00" stroke-width="2"/>
+<path d="M84 108 L98 134 L112 108" stroke="#e8480c" stroke-width="4" fill="none"/>
+<path d="M54 180 Q96 192 142 180" stroke="#e8480c" stroke-width="4" fill="none"/>
+<path d="M118 106 L132 112 L160 150 L148 157Z" fill="#9b4dca"/>
+<path d="M126 114 L132 122 L123 120Z M138 128 L145 134 L136 135Z" fill="#2ea64a" stroke="none"/>
+<path d="M68 108 L82 108 L80 178 L66 178Z" fill="#9b4dca"/>
+<path d="M69 120 L79 124 L69 130Z M68 140 L78 144 L68 150Z M67 160 L77 164 L67 170Z" fill="#2ea64a" stroke="none"/>
+<g stroke="none"><circle cx="78" cy="112" r="3.6" fill="#ff4d6d"/><circle cx="82" cy="119" r="3.6" fill="#ffd23f"/><circle cx="88" cy="127" r="3.6" fill="#2de08a"/><circle cx="94" cy="131" r="3.6" fill="#4dabff"/><circle cx="98" cy="132" r="3.6" fill="#ff4d6d"/><circle cx="102" cy="131" r="3.6" fill="#ffd23f"/><circle cx="108" cy="127" r="3.6" fill="#2de08a"/><circle cx="114" cy="119" r="3.6" fill="#4dabff"/><circle cx="118" cy="112" r="3.6" fill="#ff4d6d"/></g>
+<g transform="rotate(-9 110 172)"><g class="dm-dr">
+<path d="M44 138 Q110 126 176 142 L176 206 Q110 218 44 206Z" fill="#a8441a" stroke="#5a1f0a" stroke-width="2.5"/>
+<ellipse cx="176" cy="174" rx="12" ry="32" fill="#8a3410" stroke="#5a1f0a" stroke-width="2.5"/>
+<path d="M84 134 Q91 172 84 210 M140 136 Q147 172 140 210" stroke="#6e1c08" stroke-width="5" fill="none"/>
+<polyline points="52,140 88,205 120,138 152,206 174,148" stroke="#f3e2c4" stroke-width="3" fill="none"/>
+<polyline points="52,206 88,138 120,207 152,136 174,198" stroke="#f3e2c4" stroke-width="3" fill="none"/>
+<ellipse cx="44" cy="172" rx="17" ry="35" fill="#f6e8cf" stroke="#6b3410" stroke-width="3"/>
+<ellipse cx="44" cy="174" rx="8" ry="14" fill="#d9c3a0" stroke="none"/>
+<g class="dm-ts" style="transform-origin:90px 206px"><line x1="90" y1="206" x2="90" y2="216" stroke="#f3e2c4" stroke-width="2"/><path d="M85 217 Q90 212 95 217 L96 228 L84 228Z" fill="#e8300c" stroke="none"/></g>
+<g class="dm-ts" style="transform-origin:124px 210px"><line x1="124" y1="210" x2="124" y2="219" stroke="#f3e2c4" stroke-width="2"/><path d="M119 220 Q124 215 129 220 L130 231 L118 231Z" fill="#ff8c1a" stroke="none"/></g>
+<g class="dm-ts" style="transform-origin:160px 205px"><line x1="160" y1="205" x2="160" y2="214" stroke="#f3e2c4" stroke-width="2"/><path d="M155 215 Q160 210 165 215 L166 226 L154 226Z" fill="#e8300c" stroke="none"/></g>
+</g></g>
+<path d="M68 120 L44 128" stroke="#c46a00" stroke-width="17"/><path d="M68 120 L44 128" stroke="#ffa81f" stroke-width="14"/>
+<path d="M124 120 L152 112" stroke="#c46a00" stroke-width="17"/><path d="M124 120 L152 112" stroke="#ffa81f" stroke-width="14"/>
+<g class="dm-hd">
+<circle cx="68" cy="82" r="7" fill="#e0985f" stroke="#a3592b" stroke-width="2"/><circle cx="127" cy="82" r="7" fill="#e0985f" stroke="#a3592b" stroke-width="2"/>
+<circle cx="97" cy="80" r="29" fill="#e0985f" stroke="#a3592b" stroke-width="2"/>
+<circle cx="81" cy="92" r="5" fill="#ff8f8f" opacity=".35" stroke="none"/><circle cx="113" cy="92" r="5" fill="#ff8f8f" opacity=".35" stroke="none"/>
+<path d="M66 76 Q62 36 98 31 Q134 36 130 74 Q114 58 98 60 Q82 58 66 76Z" fill="#ff7a1a" stroke="#b94a00" stroke-width="2"/>
+<path d="M68 64 Q98 40 128 60 L126 68 Q98 50 70 72Z" fill="#ffb21a" stroke="none"/>
+<g class="dm-tf"><ellipse cx="112" cy="18" rx="6.5" ry="17" transform="rotate(-38 112 36)" fill="#ffb21a" stroke="#b94a00" stroke-width="1.5"/><ellipse cx="112" cy="18" rx="6.5" ry="17" transform="rotate(-19 112 36)" fill="#ff7a1a" stroke="#b94a00" stroke-width="1.5"/><ellipse cx="112" cy="18" rx="6.5" ry="17" fill="#ffb21a" stroke="#b94a00" stroke-width="1.5"/><ellipse cx="112" cy="18" rx="6.5" ry="17" transform="rotate(19 112 36)" fill="#ff7a1a" stroke="#b94a00" stroke-width="1.5"/><ellipse cx="112" cy="18" rx="6.5" ry="17" transform="rotate(38 112 36)" fill="#ffb21a" stroke="#b94a00" stroke-width="1.5"/></g>
+<path d="M97 62 Q100 68 97 73 Q94 68 97 62Z" fill="#e8300c" stroke="none"/>
+<path d="M79 75 Q86 70 92 75 M102 75 Q108 70 115 75" stroke="#2a1408" stroke-width="2.4" fill="none"/>
+<g class="dm-ey" stroke="none"><ellipse cx="86" cy="83" rx="3.4" ry="4.4" fill="#2a1408"/><ellipse cx="108" cy="83" rx="3.4" ry="4.4" fill="#2a1408"/></g>
+<path d="M99 86 Q103 91 97 93" stroke="#a3592b" stroke-width="2" fill="none"/>
+<g class="dm-mo"><path d="M82 96 Q97 114 112 96Z" fill="#7a1f1f" stroke="none"/><path d="M85 97 Q97 103 109 97 L109 99 Q97 105 85 99Z" fill="#fff" stroke="none"/></g>
+</g>
+<g class="dm-l">
+<path d="M44 128 L30 102" stroke="#c46a00" stroke-width="15"/><path d="M44 128 L30 102" stroke="#ffa81f" stroke-width="12"/>
+<path d="M40 121 L33 108" stroke="#e8480c" stroke-width="13"/>
+<path d="M29 98 Q8 80 18 42" stroke="#9c6b2c" stroke-width="6.5" fill="none"/><path d="M29 98 Q8 80 18 42" stroke="#f0c987" stroke-width="3.8" fill="none"/>
+<circle cx="28" cy="97" r="8.5" fill="#e0985f" stroke="#a3592b" stroke-width="2"/>
+</g>
+<g class="dm-r">
+<path d="M152 112 L162 86" stroke="#c46a00" stroke-width="15"/><path d="M152 112 L162 86" stroke="#ffa81f" stroke-width="12"/>
+<path d="M155 104 L159 94" stroke="#e8480c" stroke-width="13"/>
+<path d="M163 82 L187 34" stroke="#9c6b2c" stroke-width="6.5"/><path d="M163 82 L187 34" stroke="#f0c987" stroke-width="3.8"/>
+<circle cx="163" cy="82" r="8.5" fill="#e0985f" stroke="#a3592b" stroke-width="2"/>
+</g>
+</g>
+</g></svg>`;
+function sfxDholOut(){if(muted||FAST)return;boost=2.2;const t=now(),P='dtdttdtdtd';for(let k=0;k<P.length;k++)dholHit(t+k*.15,P[k]);boost=1}
+function showDholBoy(c){if(FAST)return;const bd=$('#board');let e=document.getElementById('dm_'+c);
+  if(!e){e=document.createElement('div');e.id='dm_'+c;e.className='dm';e.innerHTML=DHOL_SVG;bd.appendChild(e)}
+  const [ox,oy]=YOFF[c];e.style.width=(DHOL_CELLS/N*100)+'%';e.style.left=((ox+L/2)/N*100)+'%';e.style.top=((oy+L/2)/N*100)+'%';
+  e.classList.remove('show');void e.offsetWidth;e.classList.add('show');sfxDholOut();
+  clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),DHOL_MS)}
+const clearDholBoys=()=>document.querySelectorAll('.dm').forEach(e=>e.remove());
 $('#snd').onpointerdown=e=>{e.preventDefault();muted=!muted;$('#snd').textContent=muted?'🔇':'🔊'};
 
 /* ---------- effects ---------- */
@@ -376,7 +499,7 @@ $('#go').onclick=()=>{COLORS.forEach(c=>mode[c]=$('#m_'+c).value);players=COLORS
   A();$('#setup').classList.add('hide');newGame()};
 $('#again').onclick=()=>{$('#win').classList.add('hide');$('#setup').classList.remove('hide')};
 
-function newGame(res){gen++;phase='idle';leftSet.clear();$('#quit').classList.remove('hide');$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());
+function newGame(res){gen++;phase='idle';leftSet.clear();$('#quit').classList.remove('hide');$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();
   T={};killed={};
   players.forEach(c=>{T[c]=res?res.T[c]:[-1,-1,-1,-1];killed[c]=res?!!res.killed[c]:false;tokEl[c]=[0,1,2,3].map(i=>{const e=document.createElement('div');e.className='tk';
     e.style.width=e.style.height=(100/N*.92)+'%';
@@ -452,13 +575,16 @@ async function rollDice(forced){if(busy||phase!=='roll')return;busy=true;phase='
 async function doMove(c,i){if(busy||phase!=='move')return;busy=true;phase='moving';const g=gen;
   tokEl[c].forEach(e=>e.classList.remove('can'));
   const list=stepsList(c,T[c][i],roll);let warned=false;
+  const fromYard=T[c][i]<0,willKill=victims(c,list[list.length-1]).length>0,trail=[coord(c,i,T[c][i])];
   for(const np of list){const prev=T[c][i];
     if(prev>=0&&prev<HB&&prev%R===LAST&&!killed[c]&&!warned){warned=true;toast('🔒 Cut a goti first!')}
-    T[c][i]=np;place();sfxTick();await sleep(150);if(g!==gen)return}
+    T[c][i]=np;
+    if(willKill){trail.push(coord(c,i,np));continue}        /* a killing move: the hammer itself hops over these squares */
+    place();sfxTick();if(fromYard)showDholBoy(c);await sleep(150);if(g!==gen)return}
   const np=T[c][i];let extra=roll===6;
   const v=victims(c,np);
   if(v.length){
-    await hammerHit(c,i,v,()=>{sfxKill();showToon('toonL',2900);flash('#ffb000');toast('🥁 Wo maara!')},()=>{v.forEach(([o,j])=>T[o][j]=-1);killed[c]=true;place()});
+    await hammerHit(c,i,v,()=>{sfxKill();showToon('toonL',2900);flash('#ffb000');toast('🥁 Wo maara!')},()=>{v.forEach(([o,j])=>T[o][j]=-1);killed[c]=true;place()},trail);
     if(g!==gen)return;
     burst(tokEl[c][i],50,[HEX[c],'#fff','#ffd23f']);extra=true;await sleep(600);if(g!==gen)return}
   if(np===FIN_P){sfxShehnai();showToon('toonR',3500);toast('🏠 Griha Pravesh!');burst(tokEl[c][i],40);extra=true;await sleep(400)}
@@ -478,7 +604,7 @@ function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.
 $('#quit').onclick=()=>{if(!confirm(ONLINE?'Quit this game? You leave your seat and the others carry on.':'Quit this game and go back to the menu?'))return;
   if(ONLINE){const x={room:me.room,id:me.id};leaveOnline();api('/api/leave',x)}else clearLocal();
   gen++;phase='idle';busy=true;['#fin','#quit','#skip','#win'].forEach(q=>$(q).classList.add('hide'));
-  Object.values(tokEl).flat().forEach(e=>e.remove());$('#st').textContent='';
+  Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();$('#st').textContent='';
   $('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide');$('#setup').classList.remove('hide')};
 $('#fin').onclick=()=>{if(phase==='over')return;if(!confirm('Finish the game now and show the result?'))return;if(ONLINE)post({t:'finish'});else endGame()};
 function saveLocal(){try{localStorage.setItem('ludoGame',JSON.stringify({players,mode,T,killed,cur,WINN,t:Date.now()}))}catch(e){}}
