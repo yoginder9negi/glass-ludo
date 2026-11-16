@@ -63,12 +63,14 @@ h1{margin:0;z-index:1;font-size:clamp(16px,3.2vw,26px);letter-spacing:3px;backgr
 .c{margin:.6px;border-radius:24%;background:linear-gradient(145deg,#fff,#e7ecff);border:1px solid #fff;box-shadow:0 1px 3px #0004,inset 0 -2px 4px #0000001a;display:flex;align-items:center;justify-content:center;font-size:calc(var(--bs)/24);color:#ff9d00;font-weight:700}
 .c.col{color:#fff;text-shadow:0 1px 3px #0006}
 .yard{margin:0;border-radius:16px;border:1px solid rgba(255,255,255,.6)}
-.yard{position:relative}
-.yn{position:absolute;left:50%;top:calc(var(--bs)/220);transform:translateX(-50%);max-width:90%;padding:0 8px;border-radius:8px;background:rgba(15,10,45,.38);color:#fff;font-size:max(8px,calc(var(--bs)/40));font-weight:600;letter-spacing:.4px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;z-index:3;text-shadow:0 1px 2px #0006}
-.yn:empty{display:none}
 body.ios .glass,body.ios .ov{backdrop-filter:none;-webkit-backdrop-filter:none}   /* iPhone Safari: blur layers wash out the board colours */
 body.ios .glass{background:rgba(50,30,110,.55)}
-.yi{border-radius:16px;background:rgba(255,255,255,.35);box-shadow:inset 0 0 18px #fff9}
+.yn{position:absolute;left:50%;top:50%;width:140%;transform:translate(-50%,-50%) rotate(-45deg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none;
+ font-size:calc(var(--bs)*var(--fs,.05));font-weight:800;line-height:1.15;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);
+ text-shadow:-.04em -.04em .03em rgba(0,0,0,.34),.05em .05em .03em rgba(255,255,255,.8)}   /* embossed: dark edge top-left, light edge bottom-right */
+.yn .a{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yn .b{font-size:.6em;letter-spacing:.22em}
+.yi{position:relative;overflow:hidden;border-radius:16px;background:rgba(255,255,255,.35);box-shadow:inset 0 0 18px #fff9}
 #ctr{margin:0;border-radius:8px;background:conic-gradient(from -45deg,#2de08a 0 90deg,#ffd23f 90deg 180deg,#4dabff 180deg 270deg,#ff4d6d 270deg 360deg);box-shadow:inset 0 0 25px #fff8;border:1px solid #fff9}
 .tk{position:absolute;border-radius:50%;pointer-events:none;transform:translate(calc(-50% + var(--ox,0%)),calc(-50% + var(--oy,0%)));transition:left var(--tt,.07s) linear,top var(--tt,.07s) linear;z-index:5;border:2px solid #fff;box-shadow:0 4px 8px #0007,inset -3px -4px 8px #0006,inset 3px 3px 6px #fffa}
 .tk::after{content:"";position:absolute;left:22%;top:14%;width:32%;height:22%;border-radius:50%;background:#fffc;filter:blur(1px)}
@@ -177,7 +179,7 @@ body.lite .dm svg{filter:none}
 /* --- name boxes, leaderboard --- */
 .ov .glass{max-height:96vh;overflow:auto}
 #opts .row{gap:6px}
-.nm{width:98px;flex:none;padding:6px 4px;font-size:13px;border-radius:10px}
+.nm{flex:1;min-width:70px;max-width:150px;padding:7px 8px;font-size:14px;border-radius:10px}
 .sr{display:flex;align-items:center;gap:8px;padding:7px 10px;margin:5px 0;border-radius:14px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);text-align:left}
 .sr .rk{font-size:20px;width:30px;text-align:center;flex:none}
 .sr .nm2{flex:1;min-width:0}
@@ -234,7 +236,7 @@ body.lite .dm svg{filter:none}
 <div id="setup" class="ov"><div class="glass">
   <h2 style="margin:0 0 2px">🎲 New Game</h2>
   <div class="by">Developed by Yoginder Singh Negi</div>
-  <div style="font-size:13px;opacity:.9">Choose start corners</div>
+  <div style="font-size:13px;opacity:.9">Choose corners, player type and a name for each human player (shown in their start box)</div>
   <div id="presets"><button data-p="d1">2P ⤡ Red–Yellow</button><button data-p="d2">2P ⤢ Green–Blue</button><button data-p="p3">3 Players</button><button data-p="p4">4 Players</button></div>
   <div id="opts"></div>
   <div class="row"><span>🏁 Win by getting</span><select id="winN"><option value="1">1 goti home</option><option value="2">2 goti home</option><option value="3">3 goti home</option><option value="4" selected>all 4 goti home</option></select></div>
@@ -311,8 +313,8 @@ function cell(x,y,cls,col,txt){const d=document.createElement('div');d.className
   if(col){d.style.background=`linear-gradient(145deg,${col},${col}bb)`;d.style.boxShadow=`0 0 8px ${col}aa`}
   if(txt)d.textContent=txt;grid.appendChild(d);return d}
 COLORS.forEach(c=>{const [ox,oy]=YOFF[c];
-  const y=cell(0,0,'yard',HEX[c]);{const yn=document.createElement('div');yn.className='yn';y.appendChild(yn);yardNm[c]=yn}y.style.gridArea=`${oy+1}/${ox+1}/${oy+1+L}/${ox+1+L}`;y.style.margin=`calc(var(--bs)/${N}*.75)`;
-  const yi=document.createElement('div');yi.className='yi';yi.style.gridArea=`${oy+2}/${ox+2}/${oy+L}/${ox+L}`;yi.style.margin=`calc(var(--bs)/${N}*.2)`;grid.appendChild(yi)});
+  const y=cell(0,0,'yard',HEX[c]);y.style.gridArea=`${oy+1}/${ox+1}/${oy+1+L}/${ox+1+L}`;y.style.margin=`calc(var(--bs)/${N}*.75)`;
+  const yi=document.createElement('div');yi.className='yi';yi.style.gridArea=`${oy+2}/${ox+2}/${oy+L}/${ox+L}`;yi.style.margin=`calc(var(--bs)/${N}*.2)`;{const yn=document.createElement('div'),a=document.createElement('span'),b=document.createElement('span');yn.className='yn';a.className='a';b.className='b';yn.append(a,b);yi.appendChild(yn);yardNm[c]={box:yn,a,b}}grid.appendChild(yi)});
 PATH.forEach(([x,y],i)=>{const hc=COLORS.find(c=>START[c]===i);
   cell(x,y,'c'+(hc?' col':''),hc?HEX[hc]:null,hc?'➤':(SAFE.has(i)?'★':''))});
 COLORS.forEach(c=>HOME[c].forEach(([x,y])=>cell(x,y,'c',HEX[c])));
@@ -579,7 +581,7 @@ $('#stReset').onclick=()=>{if(confirm('Delete ALL leaderboard data on this devic
 
 function buildSetup(){const o=$('#opts');o.innerHTML='';COLORS.forEach(c=>{const r=document.createElement('div');r.className='row';
   r.innerHTML=`<span style="white-space:nowrap"><span class="dot" style="background:${HEX[c]};color:${HEX[c]}"></span>${NAME[c]}</span>
-  <input class="nm" id="n_${c}" maxlength="14" placeholder="Name" autocomplete="off">
+  <input class="nm" id="n_${c}" maxlength="14" placeholder="Player name" autocomplete="off">
   <select id="m_${c}"><option value="human">Human</option><option value="cpu">Computer</option><option value="off">Off</option></select>`;o.appendChild(r);$('#m_'+c).value=mode[c];
   $('#n_'+c).value=offNames[c]||(c==='red'?(lsGet('ludoProfile','')):'');$('#m_'+c).onchange=syncNm});syncNm()}
 function syncNm(){COLORS.forEach(c=>$('#n_'+c).classList.toggle('hide',$('#m_'+c).value!=='human'))}
@@ -587,7 +589,10 @@ buildSetup();
 const OPP={red:'yellow',yellow:'red',green:'blue',blue:'green'};
 const PRE={d1:{red:'human',yellow:'cpu',green:'off',blue:'off'},d2:{green:'human',blue:'cpu',red:'off',yellow:'off'},p3:{red:'human',green:'cpu',yellow:'cpu',blue:'off'},p4:{red:'human',green:'cpu',yellow:'cpu',blue:'cpu'}};
 document.querySelectorAll('#presets button').forEach(b=>b.onclick=()=>{Object.assign(mode,PRE[b.dataset.p]);COLORS.forEach(c=>$('#m_'+c).value=mode[c]);syncNm()});
-$('#go').onclick=()=>{COLORS.forEach(c=>mode[c]=$('#m_'+c).value);const nm={};COLORS.forEach(c=>{const n=$('#n_'+c).value.trim();offNames[c]=n;if(mode[c]==='human'&&n)nm[c]=n});lsSet('ludoOffNames',JSON.stringify(offNames));players=COLORS.filter(c=>mode[c]!=='off');
+$('#go').onclick=()=>{COLORS.forEach(c=>mode[c]=$('#m_'+c).value);
+  const blank=COLORS.filter(c=>mode[c]==='human'&&!$('#n_'+c).value.trim());
+  if(blank.length&&confirm('Enter a name for each human player?\n\nOK = enter names now\nCancel = start with colour names')){$('#n_'+blank[0]).focus();return}
+  const nm={};COLORS.forEach(c=>{const n=$('#n_'+c).value.trim();offNames[c]=n;if(mode[c]==='human'&&n)nm[c]=n});lsSet('ludoOffNames',JSON.stringify(offNames));players=COLORS.filter(c=>mode[c]!=='off');
   if(players.length<2){alert('Select at least 2 players');return}
   if(players.length===2&&OPP[players[0]]!==players[1]&&confirm('With 2 players, opposite corners are fairer. Move the second player to the opposite corner?')){
     const a=players[0],b=players[1],md=mode[b];mode[b]='off';mode[OPP[a]]=md;if(nm[b]){nm[OPP[a]]=nm[b];delete nm[b]}players=COLORS.filter(c=>mode[c]!=='off')}
@@ -614,8 +619,8 @@ function place(slow){const g={};
 
 const pn=c=>names[c]||NAME[c];
 const PLACE=['1st','2nd','3rd'];
-function yardNames(){COLORS.forEach(c=>{const e=yardNm[c];if(!e)return;const on=players.includes(c),k=finished.indexOf(c);   /* player name in own start box + finishing place */
-  e.textContent=on?pn(c)+(k>=0?'  ·  '+PLACE[k]:''):'';e.style.opacity=on&&leftSet.has(c)?.5:1})}
+function yardNames(){COLORS.forEach(c=>{const e=yardNm[c];if(!e)return;const on=players.includes(c),k=finished.indexOf(c),n=on?pn(c):'';   /* player name (diagonal, embossed) in own start box + finishing place */
+  e.a.textContent=n;e.b.textContent=on&&k>=0?PLACE[k]:'';e.box.style.setProperty('--fs',Math.min(.06,.42/Math.max(n.length,5)));e.box.style.opacity=on&&leftSet.has(c)?.5:1})}
 const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 cut a goti to open home';
 function say(t){const c=players[cur];$('#st').innerHTML=`<div><b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small></div>`}
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
