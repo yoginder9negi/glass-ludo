@@ -67,12 +67,16 @@ h1{margin:0;z-index:1;font-size:clamp(16px,3.2vw,26px);letter-spacing:3px;backgr
 .yard{margin:0;border-radius:16px;border:1px solid rgba(255,255,255,.6)}
 body.ios .glass,body.ios .ov{backdrop-filter:none;-webkit-backdrop-filter:none}   /* iPhone Safari: blur layers wash out the board colours */
 body.ios .glass{background:rgba(50,30,110,.55)}
-/* player tag in each start box: first 3 letters, blind-embossed (raised paper look: light edge top-left, soft shadow bottom-right) */
+/* player tag in each start box: first 3 letters, glossy gold lettering. Back layer = outline + stacked edge + soft shadow,
+   front layer = gold gradient with a diagonal sheen and a thin bright rim */
 .yn{position:absolute;left:50%;top:50%;width:100%;transform:translate(-50%,-50%) rotate(-45deg);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;
- font-family:"Helvetica Neue",Arial,"Segoe UI",sans-serif;font-weight:800;font-size:calc(var(--bs)*.075);line-height:1.1;letter-spacing:.24em;text-indent:.24em;
- color:rgba(255,255,255,.3);text-shadow:-.03em -.03em .02em rgba(255,255,255,.95),.04em .045em .045em rgba(40,25,90,.38)}
-.yn .a{display:block;white-space:nowrap}
-.yn .b{margin-top:.3em;font-size:.42em;letter-spacing:.3em;text-indent:.3em}
+ font-family:"Arial Rounded MT Bold","Arial Black",Impact,"Trebuchet MS",sans-serif;font-weight:900;font-style:italic;font-size:calc(var(--bs)*.056);line-height:1.05;letter-spacing:.1em}
+.yn .a{position:relative;display:block;color:transparent;white-space:nowrap;padding-right:.1em}
+.yn .a::before,.yn .a::after{content:attr(data-t);position:absolute;left:0;top:0;width:100%;text-align:center;letter-spacing:inherit}
+.yn .a::before{color:#6b3600;-webkit-text-stroke:.13em #6b3600;text-shadow:0 .04em 0 #9a5600,0 .08em 0 #7d4400,0 .12em 0 #5e3000,0 .2em .08em rgba(0,0,0,.45)}
+.yn .a::after{background:linear-gradient(112deg,transparent 30%,rgba(255,255,255,.75) 42%,transparent 54%),linear-gradient(180deg,#fffbd0 0%,#ffe36e 22%,#f7b500 48%,#ffe27a 60%,#e09200 82%,#b86a00 100%);
+ -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;-webkit-text-stroke:.012em #fff3b0}
+.yn .b{margin-top:.34em;font-size:.5em;font-style:normal;letter-spacing:.22em;color:#fff3c4;text-shadow:0 1px 1px #5a3000,0 0 4px #5a3000}
 .yi{position:relative;overflow:hidden;border-radius:16px;background:rgba(255,255,255,.35);box-shadow:inset 0 0 18px #fff9}
 #ctr{margin:0;border-radius:8px;background:conic-gradient(from -45deg,#2de08a 0 90deg,#ffd23f 90deg 180deg,#4dabff 180deg 270deg,#ff4d6d 270deg 360deg);box-shadow:inset 0 0 25px #fff8;border:1px solid #fff9}
 .tk{position:absolute;border-radius:50%;pointer-events:none;transform:translate(calc(-50% + var(--ox,0%)),calc(-50% + var(--oy,0%)));transition:left var(--tt,.07s) linear,top var(--tt,.07s) linear;z-index:5;border:2px solid #fff;box-shadow:0 4px 8px #0007,inset -3px -4px 8px #0006,inset 3px 3px 6px #fffa}
@@ -635,7 +639,7 @@ function crackers(ms){const cv=document.createElement('canvas'),lite=document.bo
   requestAnimationFrame(frame)}
 function celebrate(){try{crackers(CLIP_MS-1200)}catch(e){}playClip('win')}
 function yardNames(){COLORS.forEach(c=>{const e=yardNm[c];if(!e)return;const on=players.includes(c),k=finished.indexOf(c),n=on?[...pn(c)].slice(0,3).join('').toUpperCase():'';   /* player name (diagonal, embossed) in own start box + finishing place */
-  e.a.textContent=n;e.b.textContent=on&&k>=0?PLACE[k]:'';e.box.style.opacity=on&&leftSet.has(c)?.5:1})}
+  e.a.textContent=n;e.a.setAttribute('data-t',n);e.b.textContent=on&&k>=0?PLACE[k]:'';e.box.style.opacity=on&&leftSet.has(c)?.5:1})}
 const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 cut a goti to open home';
 function say(t){const c=players[cur];$('#st').innerHTML=`<div><b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small></div>`}
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
