@@ -63,6 +63,11 @@ h1{margin:0;z-index:1;font-size:clamp(16px,3.2vw,26px);letter-spacing:3px;backgr
 .c{margin:.6px;border-radius:24%;background:linear-gradient(145deg,#fff,#e7ecff);border:1px solid #fff;box-shadow:0 1px 3px #0004,inset 0 -2px 4px #0000001a;display:flex;align-items:center;justify-content:center;font-size:calc(var(--bs)/24);color:#ff9d00;font-weight:700}
 .c.col{color:#fff;text-shadow:0 1px 3px #0006}
 .yard{margin:0;border-radius:16px;border:1px solid rgba(255,255,255,.6)}
+.yard{position:relative}
+.yn{position:absolute;left:50%;top:calc(var(--bs)/220);transform:translateX(-50%);max-width:90%;padding:0 8px;border-radius:8px;background:rgba(15,10,45,.38);color:#fff;font-size:max(8px,calc(var(--bs)/40));font-weight:600;letter-spacing:.4px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;z-index:3;text-shadow:0 1px 2px #0006}
+.yn:empty{display:none}
+body.ios .glass,body.ios .ov{backdrop-filter:none;-webkit-backdrop-filter:none}   /* iPhone Safari: blur layers wash out the board colours */
+body.ios .glass{background:rgba(50,30,110,.55)}
 .yi{border-radius:16px;background:rgba(255,255,255,.35);box-shadow:inset 0 0 18px #fff9}
 #ctr{margin:0;border-radius:8px;background:conic-gradient(from -45deg,#2de08a 0 90deg,#ffd23f 90deg 180deg,#4dabff 180deg 270deg,#ff4d6d 270deg 360deg);box-shadow:inset 0 0 25px #fff8;border:1px solid #fff9}
 .tk{position:absolute;border-radius:50%;pointer-events:none;transform:translate(calc(-50% + var(--ox,0%)),calc(-50% + var(--oy,0%)));transition:left var(--tt,.07s) linear,top var(--tt,.07s) linear;z-index:5;border:2px solid #fff;box-shadow:0 4px 8px #0007,inset -3px -4px 8px #0006,inset 3px 3px 6px #fffa}
@@ -236,6 +241,7 @@ body.lite .dm svg{filter:none}
   <div style="font-size:12px;opacity:.8">Tip: with 2 players use opposite corners.</div>
   <button id="go">▶ Start Game</button>
   <div style="margin-top:12px"><button id="goOnline" style="background:linear-gradient(90deg,#2de08a88,#4dabff88);font-size:17px">🌐 Play Online with Friends</button></div>
+  <div id="srvStat" class="by" style="margin-top:10px"></div>
   <div style="margin-top:10px"><button id="goStats" style="background:linear-gradient(90deg,#ffd23f77,#ff4d6d77);font-size:16px">🏆 Leaderboard &amp; Stats</button></div>
 </div></div>
 <div id="resume" class="ov hide"><div class="glass" style="width:min(90vw,360px)">
@@ -300,12 +306,12 @@ let FAST=false,SP=.5,BACKLOG=0;try{const v=parseFloat(localStorage.getItem('ludo
 const $=s=>document.querySelector(s),sleep=ms=>new Promise(r=>setTimeout(r,FAST?0:ms*SP*(BACKLOG>2?.15:1)));
 
 /* ---------- build board ---------- */
-const grid=$('#grid');grid.style.gridTemplate=`repeat(${N},1fr)/repeat(${N},1fr)`;
+const grid=$('#grid'),yardNm={};grid.style.gridTemplate=`repeat(${N},1fr)/repeat(${N},1fr)`;
 function cell(x,y,cls,col,txt){const d=document.createElement('div');d.className=cls;d.style.gridColumn=x+1;d.style.gridRow=y+1;
   if(col){d.style.background=`linear-gradient(145deg,${col},${col}bb)`;d.style.boxShadow=`0 0 8px ${col}aa`}
   if(txt)d.textContent=txt;grid.appendChild(d);return d}
 COLORS.forEach(c=>{const [ox,oy]=YOFF[c];
-  const y=cell(0,0,'yard',HEX[c]);y.style.gridArea=`${oy+1}/${ox+1}/${oy+1+L}/${ox+1+L}`;y.style.margin=`calc(var(--bs)/${N}*.75)`;
+  const y=cell(0,0,'yard',HEX[c]);{const yn=document.createElement('div');yn.className='yn';y.appendChild(yn);yardNm[c]=yn}y.style.gridArea=`${oy+1}/${ox+1}/${oy+1+L}/${ox+1+L}`;y.style.margin=`calc(var(--bs)/${N}*.75)`;
   const yi=document.createElement('div');yi.className='yi';yi.style.gridArea=`${oy+2}/${ox+2}/${oy+L}/${ox+L}`;yi.style.margin=`calc(var(--bs)/${N}*.2)`;grid.appendChild(yi)});
 PATH.forEach(([x,y],i)=>{const hc=COLORS.find(c=>START[c]===i);
   cell(x,y,'c'+(hc?' col':''),hc?HEX[hc]:null,hc?'➤':(SAFE.has(i)?'★':''))});
@@ -533,7 +539,7 @@ function burst(el,n=36,cols=Object.values(HEX)){n=Math.min(n,28);const r=el.getB
 
 /* ---------- game state ---------- */
 let mode={red:'human',green:'off',yellow:'cpu',blue:'off'},players=[],T={},killed={},cur=0,roll=0,phase='idle',busy=false,gen=0,sixCount=0,snap=null;
-let gameT0=0,statDone=false,gameNames={};
+let gameT0=0,statDone=false,gameNames={},finished=[];
 let leftSet=new Set(),ONLINE=false,me={},names={},lastN=0,sentRoll=false,sentMove=false,onlineOn=[],started=false,lobbySeats={},lobbyHost='',es=null,BASE='',pollGen=0,synced=false,WINN=4,ws=null,spinning=false,selfMoves=0;
 function normBase(v){v=(v||'').trim();if(!v)return'';try{return new URL(/^https?:\/\//i.test(v)?v:((/^(\d+\.\d+\.\d+\.\d+|localhost)/.test(v)?'http://':'https://')+v)).origin}catch(e){return''}}
 if(location.protocol==='file:'){try{BASE=normBase(localStorage.getItem('ludoServer'))}catch(e){}}
@@ -590,11 +596,11 @@ $('#go').onclick=()=>{COLORS.forEach(c=>mode[c]=$('#m_'+c).value);const nm={};CO
 $('#again').onclick=()=>{$('#win').classList.add('hide');$('#setup').classList.remove('hide')};
 
 function newGame(res){gen++;gameT0=Date.now();statDone=false;gameNames=Object.assign({},names);phase='idle';leftSet.clear();$('#quit').classList.remove('hide');$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();
-  T={};killed={};
+  T={};killed={};finished=res&&res.finished?res.finished.slice():[];
   players.forEach(c=>{T[c]=res?res.T[c]:[-1,-1,-1,-1];killed[c]=res?!!res.killed[c]:false;tokEl[c]=[0,1,2,3].map(i=>{const e=document.createElement('div');e.className='tk';
     e.style.width=e.style.height=(100/N*.92)+'%';
     e.style.background=`radial-gradient(circle at 35% 30%,#fff,${HEX[c]} 55%,${HEX[c]}aa)`;e.style.color=HEX[c];$('#board').appendChild(e);return e})});
-  cur=res?res.cur:0;busy=false;sixCount=0;snap=null;place();startTurn()}
+  cur=res?res.cur:0;busy=false;sixCount=0;snap=null;yardNames();place();startTurn()}
 
 function coord(c,i,p){if(p<0){const [ox,oy]=YOFF[c];return [SPOT[i][0]+ox,SPOT[i][1]+oy]}
   if(p<HB){const q=PATH[(START[c]+p)%R];return [q[0]+.5,q[1]+.5]}
@@ -607,11 +613,14 @@ function place(slow){const g={};
     const n=a.length,ang=j/n*6.28;e.style.setProperty('--ox',n>1?Math.round(Math.cos(ang)*34)+'%':'0%');e.style.setProperty('--oy',n>1?Math.round(Math.sin(ang)*34)+'%':'0%')}))}
 
 const pn=c=>names[c]||NAME[c];
+const PLACE=['1st','2nd','3rd'];
+function yardNames(){COLORS.forEach(c=>{const e=yardNm[c];if(!e)return;const on=players.includes(c),k=finished.indexOf(c);   /* player name in own start box + finishing place */
+  e.textContent=on?pn(c)+(k>=0?'  ·  '+PLACE[k]:''):'';e.style.opacity=on&&leftSet.has(c)?.5:1})}
 const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 cut a goti to open home';
 function say(t){const c=players[cur];$('#st').innerHTML=`<div><b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small></div>`}
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
 function startTurn(){if(phase==='over')return;
-  if(leftSet.has(players[cur])){phase='skip';busy=true;const g=gen;setTimeout(()=>{if(g===gen&&phase==='skip'){busy=false;nextTurn()}},250*SP);return}
+  if(isOut(players[cur])){phase='skip';busy=true;const g=gen;setTimeout(()=>{if(g===gen&&phase==='skip'){busy=false;nextTurn()}},250*SP);return}
   phase='roll';busy=false;const c=players[cur];if(!ONLINE)saveLocal();
   $('#scene').style.setProperty('--pc',HEX[c]);$('#scene').style.setProperty('--pd',shade(HEX[c],.55));
   const mine=!ONLINE||c===me.color;
@@ -678,13 +687,15 @@ async function doMove(c,i){if(busy||phase!=='move')return;busy=true;phase='movin
     if(g!==gen)return;
     burst(tokEl[c][i],50,[HEX[c],'#fff','#ffd23f']);extra=true;await sleep(600);if(g!==gen)return}
   if(np===FIN_P){sfxShehnai();showToon('toonR',3500);toast('🏠 Griha Pravesh!');burst(tokEl[c][i],40);extra=true;await sleep(400)}
-  if(T[c].filter(x=>x===FIN_P).length>=WINN){endGame(c);return}
+  if(T[c].filter(x=>x===FIN_P).length>=WINN&&!finished.includes(c)){finished.push(c);yardNames();   /* ranked 1st, 2nd... game goes on until one player is left */
+    if(players.filter(q=>!isOut(q)).length<=1){endGame(c);return}
+    toast('🏅 '+pn(c)+' finished #'+finished.length);burst(tokEl[c][i],50);await sleep(900);if(g!==gen)return;nextTurn();return}
   if(extra)startTurn();else nextTurn()}
 
 function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');$('#quit').classList.add('hide');
-  const prog=c=>T[c].reduce((a,x)=>a+(x<0?0:x<HB?x:LAST+1+(x-HB)),0);
-  const rows=players.map(c=>({c,h:T[c].filter(x=>x===FIN_P).length,p:prog(c)})).sort((a,b)=>b.h-a.h||b.p-a.p);
-  if(w0){const wi=rows.findIndex(r=>r.c===w0);if(wi>0)rows.unshift(rows.splice(wi,1)[0])}
+  const fo=c=>{const k=finished.indexOf(c);return k<0?99:k},prog=c=>T[c].reduce((a,x)=>a+(x<0?0:x<HB?x:LAST+1+(x-HB)),0);
+  const rows=players.map(c=>({c,h:T[c].filter(x=>x===FIN_P).length,p:prog(c)})).sort((a,b)=>fo(a.c)-fo(b.c)||b.h-a.h||b.p-a.p);
+  if(w0&&!finished.length){const wi=rows.findIndex(r=>r.c===w0);if(wi>0)rows.unshift(rows.splice(wi,1)[0])}
   const w=rows[0].c;{const res={};players.forEach(c=>res[c]=c===w?'won':(leftSet.has(c)?'quit':'lost'));recStats(res)}sfxWin();$('#wt').textContent='🏆 '+pn(w)+' wins!';$('#wt').style.color=HEX[w];
   const box=$('#rank');box.innerHTML='';
   rows.forEach((r,i)=>{const d=document.createElement('div');d.className='row';const l=document.createElement('span'),dot=document.createElement('span');
@@ -698,9 +709,10 @@ $('#quit').onclick=()=>{if(!confirm(ONLINE?'Quit this game? You leave your seat 
   Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();$('#st').textContent='';
   $('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide');$('#setup').classList.remove('hide')};
 $('#fin').onclick=()=>{if(phase==='over')return;if(!confirm('Finish the game now and show the result?'))return;if(ONLINE)post({t:'finish'});else endGame()};
-function saveLocal(){try{localStorage.setItem('ludoGame',JSON.stringify({players,mode,names,T,killed,cur,WINN,t:Date.now()}))}catch(e){}}
+function saveLocal(){try{localStorage.setItem('ludoGame',JSON.stringify({players,mode,names,T,killed,cur,WINN,finished,t:Date.now()}))}catch(e){}}
 function loadLocal(){try{return JSON.parse(localStorage.getItem('ludoGame')||'null')}catch(e){return null}}
 function clearLocal(){try{localStorage.removeItem('ludoGame')}catch(e){}}
+const isOut=c=>leftSet.has(c)||finished.includes(c);   /* quit or already finished = skipped */
 function nextTurn(){sixCount=0;snap=null;cur=(cur+1)%players.length;startTurn()}
 
 /* ================= ONLINE MULTIPLAYER ================= */
@@ -778,7 +790,7 @@ async function runQ(){qrun=true;
       if(!await until(SETTLED,40000)||phase!=='move')continue;const c=players[cur];if(m.c!==c)continue;sentMove=false;
       if(!(m.i>=0&&m.i<4)||stepsList(c,T[c][m.i],roll)===null)continue;await doMove(c,m.i)}
     else if(m.t==='skip'){if(await until(()=>phase==='roll'&&!busy))nextTurn()}
-    else if(m.t==='left'){leftSet.add(m.c);const alive=players.filter(c=>!leftSet.has(c));
+    else if(m.t==='left'){leftSet.add(m.c);yardNames();const alive=players.filter(c=>!isOut(c));
       if(alive.length<=1){await until(()=>phase==='roll'||phase==='move'||phase==='over'||phase==='skip',8000);if(phase!=='over')endGame(alive[0])}
       else if(players[cur]===m.c){await until(()=>phase==='roll'||phase==='move'||phase==='over',8000);
         if(players[cur]===m.c&&(phase==='roll'||phase==='move')){tokEl[m.c].forEach(e=>e.classList.remove('can'));nextTurn()}}}
@@ -795,6 +807,7 @@ setSP(SPEEDS.some(x=>x[0]===SP)?SP:.5);
 let LITE=null;try{LITE=localStorage.getItem('ludoLite')}catch(e){}
 function setLite(on,save){document.body.classList.toggle('lite',on);$('#lite').textContent=on?'🪶 Lite':'✨ Full';if(save){try{localStorage.setItem('ludoLite',on?'1':'0')}catch(e){}}}
 $('#lite').onpointerdown=e=>{e.preventDefault();setLite(!document.body.classList.contains('lite'),true)};
+if(/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))document.body.classList.add('ios');
 if(LITE==='1')setLite(true);else if(LITE==='0')setLite(false);
 else{setLite((navigator.hardwareConcurrency||8)<=4);   // slow phones: switch effects off automatically
   let fr=0;const t0=performance.now();(function f(){fr++;const dt=performance.now()-t0;if(dt<1500)requestAnimationFrame(f);else if(fr/(dt/1000)<40)setLite(true)})()}
@@ -808,6 +821,9 @@ function showSrv(){const e=$('#srv');if(location.protocol!=='file:'||!BASE){e.cl
 $('#goOnline').onclick=()=>{A();if(location.protocol==='file:'&&!BASE&&!askServer())return;showSrv();
   $('#setup').classList.add('hide');$('#online').classList.remove('hide')};
 $('#onBack').onclick=()=>{leaveOnline();$('#online').classList.add('hide');$('#setup').classList.remove('hide');$('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide');onErr('')};
+async function loadSrvStats(){const el=$('#srvStat');try{const r=await fetch(BASE+'/api/stats',{cache:'no-store'});const d=await r.json();
+  el.textContent=`Online now: ${d.online}  ·  Games running: ${d.rooms}/${d.max_rooms}  ·  Total visits: ${Number(d.visits).toLocaleString()}`+(d.full?'  ·  Server full: new rooms paused':'')}catch(e){el.textContent=''}}
+loadSrvStats();setInterval(()=>{if(!document.hidden&&!$('#setup').classList.contains('hide'))loadSrvStats()},20000);
 $('#mkRoom').onclick=async()=>{const n=$('#pname').value.trim();if(!n){onErr('Enter your name first');return}saveProfile(n);onErr('');enter(await api('/api/create',{name:n}))};
 $('#joinRoom').onclick=async()=>{const n=$('#pname').value.trim(),r=$('#rcode').value.trim().toUpperCase();
   if(!n||r.length<4){onErr('Enter your name and the 4-letter room code');return}saveProfile(n);onErr('');
@@ -883,10 +899,20 @@ HTML_GZ = gzip.compress(HTML_BYTES, 9)      # compressed once at start-up, not p
 COLORS = ["red", "green", "yellow", "blue"]
 OPPOSITE = {"red": "yellow", "yellow": "red", "green": "blue", "blue": "green"}
 CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-ROOM_TTL = 6 * 3600                 # idle rooms are dropped after 6 hours
-MAX_ROOMS = 500
+ROOM_TTL = 6 * 3600                 # a started game with nobody connected is dropped after 6 hours
+LOBBY_TTL = 30 * 60                 # a room nobody started is dropped after 30 minutes
+ACTIVE_WINDOW = 15 * 60             # a room counts as "running" if someone is connected or it moved in the last 15 min
+# Capacity limit: new rooms are refused once this many games are running (players already in a room are never kicked).
+# Measured: 100 rooms (400 players) uses <1% of a CPU core and ~45 MB; override with the MAX_ROOMS environment variable.
+MAX_ROOMS = int(os.environ.get("MAX_ROOMS", 100))
+VISIT_GAP = 30 * 60                 # same visitor (IP) within 30 minutes counts as one visit
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 ROOMS_FILE = os.environ.get("ROOMS_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "ludo_rooms.json"))
+
+STATS_FILE = os.environ.get("STATS_FILE", os.path.join(os.path.dirname(ROOMS_FILE), "ludo_stats.json"))
+STATS = {"visits": 0, "today": 0, "day": "", "since": int(time.time())}
+STATS_LOCK = threading.Lock()
+VISITORS = {}                       # ip -> time of last counted visit
 
 RNG = random.SystemRandom()         # the server rolls the dice, so nobody can cheat
 ROOMS = {}
@@ -914,6 +940,10 @@ class Room:
         self.touch = time.time()
         self.lock = threading.RLock()
         self.cond = threading.Condition(self.lock)
+
+    def is_active(self, now=None):
+        now = now or time.time()
+        return bool(self.conns) or now - self.touch < ACTIVE_WINDOW
 
     # ---- seats ----
     def color_of(self, cid):
@@ -978,6 +1008,7 @@ class Room:
                 qs.remove(q)
             if not qs:
                 self.conns.pop(cid, None)
+                self.seen[cid] = 0          # closed connection = offline now (not 35 s later)
 
 
 # ---- persistence (games survive a server restart where the disk is kept) ----
@@ -1005,8 +1036,65 @@ def _do_save():
         with open(tmp, "w") as f:
             json.dump(data, f)
         os.replace(tmp, ROOMS_FILE)
+        _save_stats()
     except Exception:
         pass
+
+
+def _save_stats():
+    with STATS_LOCK:
+        data = dict(STATS)
+    tmp = STATS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f)
+    os.replace(tmp, STATS_FILE)
+
+
+def load_stats():
+    try:
+        with open(STATS_FILE) as f:
+            STATS.update({k: v for k, v in json.load(f).items() if k in STATS})
+    except Exception:
+        pass
+
+
+def count_visit(ip):
+    """Count one visit per visitor (IP) per VISIT_GAP, not every reload."""
+    now = time.time()
+    if now - VISITORS.get(ip, 0) < VISIT_GAP:
+        return
+    VISITORS[ip] = now
+    if len(VISITORS) > 5000:
+        for k in [k for k, t in VISITORS.items() if now - t > VISIT_GAP]:
+            VISITORS.pop(k, None)
+    day = time.strftime("%Y-%m-%d")
+    with STATS_LOCK:
+        if STATS["day"] != day:
+            STATS["day"], STATS["today"] = day, 0
+        STATS["visits"] += 1
+        STATS["today"] += 1
+    schedule_save()
+
+
+def purge_rooms():
+    """Drop abandoned rooms so they do not use up capacity."""
+    now = time.time()
+    with ROOMS_LOCK:
+        for k, r in list(ROOMS.items()):
+            idle = now - r.touch
+            if not r.conns and (idle > ROOM_TTL or (not r.started and idle > LOBBY_TTL)):
+                del ROOMS[k]
+
+
+def server_stats():
+    purge_rooms()
+    now = time.time()
+    rooms = list(ROOMS.values())
+    running = sum(1 for r in rooms if r.is_active(now))
+    with STATS_LOCK:
+        visits, today = STATS["visits"], STATS["today"]
+    return {"visits": visits, "today": today, "online": sum(len(r.online_colors()) for r in rooms),
+            "rooms": running, "max_rooms": MAX_ROOMS, "full": running >= MAX_ROOMS}
 
 
 def load_rooms():
@@ -1046,11 +1134,10 @@ def find_room(code):
 
 
 def api_create(d):
+    purge_rooms()
+    if server_stats()["full"] or len(ROOMS) > MAX_ROOMS * 5:
+        return {"error": f"Server is full ({MAX_ROOMS} games running). Please try again in a few minutes."}
     with ROOMS_LOCK:
-        for k in [k for k, r in ROOMS.items() if time.time() - r.touch > ROOM_TTL]:
-            del ROOMS[k]
-        if len(ROOMS) > MAX_ROOMS:
-            return {"error": "Server is busy, try later"}
         code = new_code()
         while code in ROOMS:
             code = new_code()
@@ -1225,7 +1312,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def _client_ip(self):
+        fwd = self.headers.get("X-Forwarded-For", "")
+        return fwd.split(",")[0].strip() or self.client_address[0]
+
     def _page(self):
+        count_visit(self._client_ip())
         if "gzip" in self.headers.get("Accept-Encoding", ""):
             return self._send(200, HTML_GZ, "text/html; charset=utf-8",
                               {"Content-Encoding": "gzip", "Vary": "Accept-Encoding"})
@@ -1247,6 +1339,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._page()
         if p in STATIC:
             return self._send(200, *STATIC[p])
+        if p == "/api/stats":
+            return self._send(200, json.dumps(server_stats()))
         if p == "/ws":
             return self.ws(q)
         if p == "/api/poll":
@@ -1390,6 +1484,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 class Server(http.server.ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    request_queue_size = 256            # default is 5: bursts of reconnecting phones were refused
 
     def handle_error(self, request, client_address):
         pass                                              # ignore dropped phone connections quietly
@@ -1411,6 +1506,7 @@ def lan_ip():
 
 def main():
     load_rooms()
+    load_stats()
     hosted = "PORT" in os.environ                         # cloud hosts give a PORT
     port = int(os.environ.get("PORT", 8000))
     while True:
