@@ -33,6 +33,7 @@ import random
 import signal
 import socket
 import struct
+import sys
 import threading
 import time
 import webbrowser
@@ -763,13 +764,19 @@ function openWS(g){let opened=false,w;
   ws=w;
   const fb=setTimeout(()=>{if(!opened&&g===pollGen){try{w.close()}catch(e){}ws=null;pollLoop(g)}},4500);   // WebSocket blocked -> use long-poll instead
   w.onopen=()=>{opened=true;wsFails=0;clearTimeout(fb);onErr('')};
-  w.onmessage=e=>{const d=JSON.parse(e.data);if(d.n){if(d.n<=lastN)return;lastN=d.n}handle(d)};
+  w.onmessage=e=>{const d=JSON.parse(e.data);if(d.t==='pong'){gotPong(d.ts);return}if(d.n){if(d.n<=lastN)return;lastN=d.n}handle(d)};
   w.onclose=()=>{clearTimeout(fb);if(g!==pollGen||!ONLINE||ws!==w)return;ws=null;if(opened){onErr('Reconnecting…');setTimeout(()=>{if(g===pollGen&&ONLINE)openWS(g)},Math.min(600*2**wsFails++,8000))}}}
 const rs=ms=>new Promise(r=>setTimeout(r,ms));
+const RTT=[];
+function showNet(ms){const e=$('#net');e.classList.remove('hide');e.textContent=(ms<200?'🟢 ':ms<400?'🟡 ':'🔴 ')+ms+' ms'}
+function gotPong(ts){RTT.push(Math.round(performance.now()-ts));if(RTT.length>5)RTT.shift();showNet([...RTT].sort((a,b)=>a-b)[RTT.length>>1])}   /* median of the last 5 = steady number */
 async function pingLoop(g){
-  while(g===pollGen&&ONLINE){if(document.hidden){await rs(4000);continue}const t=performance.now(),e=$('#net');
-    try{await fetch(BASE+'/health',{cache:'no-store'});const ms=Math.round(performance.now()-t);e.classList.remove('hide');e.textContent=(ms<150?'🟢 ':ms<400?'🟡 ':'🔴 ')+ms+' ms'}
-    catch(x){e.classList.remove('hide');e.textContent='🔴 offline'}
+  while(g===pollGen&&ONLINE){
+    if(document.hidden){await rs(4000);continue}
+    if(ws&&ws.readyState===1){try{ws.send(JSON.stringify({t:'ping',ts:performance.now()}))}catch(x){}await rs(4000);continue}   /* real game-connection round trip, no HTTP/TLS overhead */
+    const t=performance.now();
+    try{await fetch(BASE+'/health',{cache:'no-store'});showNet(Math.round(performance.now()-t))}   /* long-poll fallback only */
+    catch(x){const e=$('#net');e.classList.remove('hide');e.textContent='🔴 offline'}
     await rs(10000)}
   $('#net').classList.add('hide')}
 async function pollLoop(g){let fails=0;
@@ -955,10 +962,13 @@ STATS = {"visits": 0, "today": 0, "day": "", "since": int(time.time())}
 STATS_LOCK = threading.Lock()
 VISITORS = {}                       # ip -> time of last counted visit
 
+COMPACT = (",", ":")                # compact JSON: fewer bytes on the wire
+
 RNG = random.SystemRandom()         # the server rolls the dice, so nobody can cheat
 ROOMS = {}
 ROOMS_LOCK = threading.Lock()       # guards the ROOMS dict only; never held while a Room lock is taken
-_save_pending = False
+SAVE_EVERY = 5                      # seconds between disk saves (a background thread; games never wait for it)
+_dirty = threading.Event()
 
 
 class Room:
@@ -974,7 +984,10 @@ class Room:
         self.names = {}             # client id -> display name
         self.host = None            # client id of the host
         self.started = False
-        self.log = []               # ordered game messages
+        self.log = []               # ordered game messages (dicts)
+        self.logj = []              # the same messages, already encoded as JSON text (sent / saved as-is)
+        self.rev = 0                # bumped on every change; lets the saver skip rooms that did not change
+        self._saved = (-1, "")      # (rev, json text) of the last save of this room
         self.conns = {}             # client id -> [Queue, ...] (open WebSockets)
         self.left = set()           # colours that quit mid-game
         self.seen = {}              # client id -> last long-poll time
@@ -1002,25 +1015,28 @@ class Room:
         return next((c for c in COLORS if c not in self.seats), None)
 
     # ---- messaging ----
-    def _fanout(self, msg):
+    def _fanout(self, raw):
         for queues in self.conns.values():
             for q in queues:
-                q.put(msg)
+                q.put(raw)
 
     def append(self, msg):
         """Add a message to the log and push it to everyone."""
         with self.lock:
             msg["n"] = len(self.log) + 1
+            raw = json.dumps(msg, separators=COMPACT)
             self.log.append(msg)
+            self.logj.append(raw)
+            self.rev += 1
             self.touch = time.time()
             self.cond.notify_all()
-            self._fanout(msg)
+            self._fanout(raw)
         schedule_save()
 
     def transient(self, msg):
         """Push a message that is not stored in the log (e.g. presence)."""
         with self.lock:
-            self._fanout(msg)
+            self._fanout(json.dumps(msg, separators=COMPACT))
 
     def online_colors(self):
         now = time.time()
@@ -1035,9 +1051,9 @@ class Room:
         """Register a live connection; returns its queue, pre-filled with everything after `after`."""
         q = queue.Queue()
         with self.lock:
-            for m in self.log[after:]:
-                q.put(m)
-            q.put({"t": "synced"})
+            for raw in self.logj[after:]:
+                q.put(raw)
+            q.put('{"t":"synced"}')
             self.conns.setdefault(cid, []).append(q)
             self.seen[cid] = time.time()
         return q
@@ -1054,28 +1070,37 @@ class Room:
 
 # ---- persistence (games survive a server restart where the disk is kept) ----
 def schedule_save():
-    """Coalesce writes: at most one disk save every 1.5 s."""
-    global _save_pending
-    if _save_pending:
-        return
-    _save_pending = True
-    threading.Timer(1.5, _do_save).start()
+    _dirty.set()                    # just raises a flag; the saver thread does the work later
+
+
+def _saver():
+    """Background thread: save at most every SAVE_EVERY seconds, and only if something changed."""
+    while True:
+        _dirty.wait()
+        time.sleep(SAVE_EVERY)
+        _dirty.clear()
+        _do_save()
+
+
+def _room_json(r):
+    """JSON text of one room. Re-encoded only when the room changed; the log reuses the already-encoded messages."""
+    with r.lock:
+        if r._saved[0] != r.rev:
+            text = '{"seats":%s,"names":%s,"host":%s,"started":%s,"touch":%s,"left":%s,"log":[%s]}' % (
+                json.dumps(r.seats), json.dumps(r.names), json.dumps(r.host), "true" if r.started else "false",
+                r.touch, json.dumps(sorted(r.left)), ",".join(r.logj))
+            r._saved = (r.rev, text)
+        return r._saved[1]
 
 
 def _do_save():
-    global _save_pending
-    _save_pending = False
     try:
         with ROOMS_LOCK:
             items = list(ROOMS.items())
-        data = {}
-        for code, r in items:
-            with r.lock:
-                data[code] = {"seats": dict(r.seats), "names": dict(r.names), "host": r.host, "started": r.started,
-                              "log": list(r.log), "touch": r.touch, "left": list(r.left)}
+        body = "{" + ",".join("%s:%s" % (json.dumps(code), _room_json(r)) for code, r in items) + "}"
         tmp = ROOMS_FILE + ".tmp"
         with open(tmp, "w") as f:
-            json.dump(data, f)
+            f.write(body)
         os.replace(tmp, ROOMS_FILE)
         _save_stats()
     except Exception:
@@ -1160,6 +1185,8 @@ def load_rooms():
         r = Room(code)
         r.seats, r.names, r.host = d["seats"], d["names"], d["host"]
         r.started, r.log, r.touch = d["started"], d["log"], now
+        r.logj = [json.dumps(m, separators=COMPACT) for m in r.log]
+        r.rev = 1
         r.left = set(d.get("left", []))
         ROOMS[code] = r
 
@@ -1435,9 +1462,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     break
                 r.cond.wait(min(left, 5))
                 r.seen[cid] = time.time()
-            msgs = r.log[after:after + 300]
+            msgs = ",".join(r.logj[after:after + 300])
             more = len(r.log) > after + 300
-        self._send(200, json.dumps({"msgs": msgs, "more": more, "on": r.online_colors()}))
+        self._send(200, '{"msgs":[%s],"more":%s,"on":%s}' % (msgs, "true" if more else "false", json.dumps(r.online_colors())))
 
     # ---- WebSocket transport ----
     def ws_read(self):
@@ -1490,10 +1517,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         send_lock, alive = threading.Lock(), threading.Event()
         alive.set()
 
-        def send(op, payload=b""):
-            frame = ws_frame(op, payload)
+        def send_raw(data):
             with send_lock:
-                sock.sendall(frame)
+                sock.sendall(data)
+
+        def send(op, payload=b""):
+            send_raw(ws_frame(op, payload))
 
         qu = r.attach(cid, _after(q))
         r.presence()
@@ -1506,9 +1535,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     except queue.Empty:
                         send(9)                           # keep-alive ping
                         continue
+                    frames = []
+                    while item is not None:                   # send everything that is already waiting in ONE write
+                        frames.append(ws_frame(1, item))
+                        if len(frames) >= 64:
+                            break
+                        try:
+                            item = qu.get_nowait()
+                        except queue.Empty:
+                            break
+                    if frames:
+                        send_raw(b"".join(frames))
                     if item is None:
                         break
-                    send(1, json.dumps(item))
             except OSError:
                 pass
             finally:
@@ -1526,6 +1565,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     try:
                         msg = json.loads(payload.decode("utf-8"))
                     except Exception:
+                        continue
+                    if isinstance(msg, dict) and msg.get("t") == "ping":     # latency meter: answer at once, never queued
+                        send(1, '{"t":"pong","ts":%s}' % json.dumps(msg.get("ts")))
                         continue
                     api_send({"room": r.code, "id": cid, "msg": msg})
         except (OSError, ValueError):
@@ -1565,8 +1607,10 @@ def lan_ip():
 
 
 def main():
+    sys.setswitchinterval(0.002)                          # let a waiting player's thread run sooner under load
     load_rooms()
     load_stats()
+    threading.Thread(target=_saver, daemon=True).start()
     hosted = "PORT" in os.environ                         # cloud hosts give a PORT
     port = int(os.environ.get("PORT", 8000))
     while True:
