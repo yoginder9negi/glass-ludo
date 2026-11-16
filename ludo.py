@@ -65,11 +65,15 @@ h1{margin:0;z-index:1;font-size:clamp(16px,3.2vw,26px);letter-spacing:3px;backgr
 .yard{margin:0;border-radius:16px;border:1px solid rgba(255,255,255,.6)}
 body.ios .glass,body.ios .ov{backdrop-filter:none;-webkit-backdrop-filter:none}   /* iPhone Safari: blur layers wash out the board colours */
 body.ios .glass{background:rgba(50,30,110,.55)}
-.yn{position:absolute;left:50%;top:50%;width:140%;transform:translate(-50%,-50%) rotate(-45deg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none;
- font-size:calc(var(--bs)*var(--fs,.05));font-weight:800;line-height:1.15;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);
- text-shadow:-.04em -.04em .03em rgba(0,0,0,.34),.05em .05em .03em rgba(255,255,255,.8)}   /* embossed: dark edge top-left, light edge bottom-right */
-.yn .a{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.yn .b{font-size:.6em;letter-spacing:.22em}
+/* player tag in each start box: first 3 letters, glossy gold 3D lettering (back layer = outline + extrusion, front layer = gold gradient) */
+.yn{position:absolute;left:50%;top:50%;width:100%;transform:translate(-50%,-50%) rotate(-45deg);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;
+ font-family:"Arial Rounded MT Bold","Arial Black",Impact,"Trebuchet MS",sans-serif;font-weight:900;font-size:calc(var(--bs)*.072);line-height:1.05;letter-spacing:.05em}
+.yn .a{position:relative;display:block;color:transparent;white-space:nowrap}
+.yn .a::before,.yn .a::after{content:attr(data-t);position:absolute;left:0;top:0;width:100%;text-align:center;letter-spacing:inherit}
+.yn .a::before{color:#7a3f00;-webkit-text-stroke:.11em #7a3f00;text-shadow:0 .035em 0 #a45d00,0 .07em 0 #8a4a00,0 .105em 0 #6d3800,0 .15em .07em rgba(0,0,0,.5)}
+.yn .a::after{background:linear-gradient(115deg,transparent 28%,rgba(255,255,255,.6) 40%,transparent 52%),linear-gradient(180deg,#fff7b8 0%,#ffe066 24%,#f5b400 50%,#ffd95a 64%,#d98c00 86%,#b06300 100%);
+ -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+.yn .b{margin-top:.28em;font-size:.46em;letter-spacing:.2em;color:#fff3c4;text-shadow:0 1px 1px #5a3000,0 0 4px #5a3000}
 .yi{position:relative;overflow:hidden;border-radius:16px;background:rgba(255,255,255,.35);box-shadow:inset 0 0 18px #fff9}
 #ctr{margin:0;border-radius:8px;background:conic-gradient(from -45deg,#2de08a 0 90deg,#ffd23f 90deg 180deg,#4dabff 180deg 270deg,#ff4d6d 270deg 360deg);box-shadow:inset 0 0 25px #fff8;border:1px solid #fff9}
 .tk{position:absolute;border-radius:50%;pointer-events:none;transform:translate(calc(-50% + var(--ox,0%)),calc(-50% + var(--oy,0%)));transition:left var(--tt,.07s) linear,top var(--tt,.07s) linear;z-index:5;border:2px solid #fff;box-shadow:0 4px 8px #0007,inset -3px -4px 8px #0006,inset 3px 3px 6px #fffa}
@@ -236,7 +240,7 @@ body.lite .dm svg{filter:none}
 <div id="setup" class="ov"><div class="glass">
   <h2 style="margin:0 0 2px">🎲 New Game</h2>
   <div class="by">Developed by Yoginder Singh Negi</div>
-  <div style="font-size:13px;opacity:.9">Choose corners, player type and a name for each human player (shown in their start box)</div>
+  <div style="font-size:13px;opacity:.9">Choose corners, player type and a name for each human player (first 3 letters shown in their start box)</div>
   <div id="presets"><button data-p="d1">2P ⤡ Red–Yellow</button><button data-p="d2">2P ⤢ Green–Blue</button><button data-p="p3">3 Players</button><button data-p="p4">4 Players</button></div>
   <div id="opts"></div>
   <div class="row"><span>🏁 Win by getting</span><select id="winN"><option value="1">1 goti home</option><option value="2">2 goti home</option><option value="3">3 goti home</option><option value="4" selected>all 4 goti home</option></select></div>
@@ -619,8 +623,8 @@ function place(slow){const g={};
 
 const pn=c=>names[c]||NAME[c];
 const PLACE=['1st','2nd','3rd'];
-function yardNames(){COLORS.forEach(c=>{const e=yardNm[c];if(!e)return;const on=players.includes(c),k=finished.indexOf(c),n=on?pn(c):'';   /* player name (diagonal, embossed) in own start box + finishing place */
-  e.a.textContent=n;e.b.textContent=on&&k>=0?PLACE[k]:'';e.box.style.setProperty('--fs',Math.min(.06,.42/Math.max(n.length,5)));e.box.style.opacity=on&&leftSet.has(c)?.5:1})}
+function yardNames(){COLORS.forEach(c=>{const e=yardNm[c];if(!e)return;const on=players.includes(c),k=finished.indexOf(c),n=on?[...pn(c)].slice(0,3).join('').toUpperCase():'';   /* player name (diagonal, embossed) in own start box + finishing place */
+  e.a.textContent=n;e.a.setAttribute('data-t',n);e.b.textContent=on&&k>=0?PLACE[k]:'';e.box.style.opacity=on&&leftSet.has(c)?.5:1})}
 const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 cut a goti to open home';
 function say(t){const c=players[cur];$('#st').innerHTML=`<div><b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small></div>`}
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
