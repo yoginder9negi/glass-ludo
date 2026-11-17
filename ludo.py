@@ -652,8 +652,12 @@ function startTurn(){if(phase==='over')return;
   say(mode[c]==='cpu'?'(CPU) rolling…':mine?'tap the dice 🎲':'is playing…');
   $('#scene').classList.remove('six','sad');$('#scene').classList.toggle('wait',mode[c]==='human'&&mine);updSkip();
   if(mode[c]==='cpu'){const g=gen;setTimeout(()=>{if(g===gen)rollDice()},550*SP)}}
+let nextRoll=0,selfRolls=0;const predicted=[];   /* nextRoll: the server told me my next number in advance */
+function desync(){toast('⚠ Out of sync - reloading');try{sessionStorage.setItem('autoResume','1')}catch(e){}setTimeout(()=>location.reload(),800)}
 $('#scene').onpointerdown=e=>{e.preventDefault();A();
-  if(ONLINE){if(phase==='roll'&&players[cur]===me.color&&!sentRoll){sentRoll=true;startSpin();setTimeout(()=>{sentRoll=false;if(spinning)stopSpin()},6000);post({t:'roll'})}return}
+  if(ONLINE){if(phase==='roll'&&players[cur]===me.color&&!sentRoll){sentRoll=true;
+    if(nextRoll>=1&&nextRoll<=6){const v=nextRoll;nextRoll=0;selfRolls++;predicted.push(v);setTimeout(()=>{sentRoll=false},6000);post({t:'roll'});rollDice(v)}   /* dice starts at once; the server's echo only confirms it */
+    else{startSpin();setTimeout(()=>{sentRoll=false;if(spinning)stopSpin()},6000);post({t:'roll'})}}return}
   if(phase==='roll'&&mode[players[cur]]==='human')rollDice()};
 
 /* tap anywhere near a glowing token to move it */
@@ -749,11 +753,12 @@ function post(msg){if(ws&&ws.readyState===1){try{ws.send(JSON.stringify(msg));re
 async function postHTTP(msg,tries=3){for(let i=0;i<tries;i++){
     try{const r=await fetch(BASE+'/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:me.room,id:me.id,msg})});if(r.ok)return}catch(e){}
     await rs(500*(i+1))}
-  toast('⚠ Connection problem - resyncing');if(msg.t==='move'){try{sessionStorage.setItem('autoResume','1')}catch(e){}setTimeout(()=>location.reload(),1200)}}
+  toast('⚠ Connection problem - resyncing');if(msg.t==='move'||(msg.t==='roll'&&selfRolls>0)){try{sessionStorage.setItem('autoResume','1')}catch(e){}setTimeout(()=>location.reload(),1200)}}
 function sendMove(i){if(sentMove||phase!=='move')return;sentMove=true;setTimeout(()=>sentMove=false,6000);selfMoves++;post({t:'move',i});doMove(me.color,i)}   // moves instantly on your screen
 const onErr=t=>{$('#onErr').textContent=t||''};
 const inviteUrl=()=>`${BASE||location.origin}/?room=${me.room}`;
 function enter(res){if(res.error){onErr(res.error);return}
+  nextRoll=0;selfRolls=0;predicted.length=0;
   ONLINE=true;me={id:res.id,color:res.color,room:res.room,host:false};lastN=0;started=false;names={};
   try{localStorage.setItem('ludoSess',JSON.stringify({room:me.room,id:me.id,name:$('#pname').value.trim()}))}catch(e){}
   $('#onJoin').classList.add('hide');$('#onLobby').classList.remove('hide');$('#rc').textContent=me.room;connect()}
@@ -764,7 +769,7 @@ function openWS(g){let opened=false,w;
   ws=w;
   const fb=setTimeout(()=>{if(!opened&&g===pollGen){try{w.close()}catch(e){}ws=null;pollLoop(g)}},4500);   // WebSocket blocked -> use long-poll instead
   w.onopen=()=>{opened=true;wsFails=0;clearTimeout(fb);onErr('')};
-  w.onmessage=e=>{const d=JSON.parse(e.data);if(d.t==='pong'){gotPong(d.ts);return}if(d.n){if(d.n<=lastN)return;lastN=d.n}handle(d)};
+  w.onmessage=e=>{const d=JSON.parse(e.data);if(d.t==='pong'){gotPong(d.ts);return}if(d.t==='next'){nextRoll=d.v;return}if(d.n){if(d.n<=lastN)return;lastN=d.n}handle(d)};
   w.onclose=()=>{clearTimeout(fb);if(g!==pollGen||!ONLINE||ws!==w)return;ws=null;if(opened){onErr('Reconnecting…');setTimeout(()=>{if(g===pollGen&&ONLINE)openWS(g)},Math.min(600*2**wsFails++,8000))}}}
 const rs=ms=>new Promise(r=>setTimeout(r,ms));
 const RTT=[];
@@ -817,7 +822,8 @@ async function until(f,ms=12000){const t=Date.now();while(!f()){if(Date.now()-t>
 const SETTLED=()=>(phase==='roll'&&!busy)||phase==='move'||phase==='over'||phase==='idle';
 async function runQ(){qrun=true;
   while(MQ.length){BACKLOG=MQ.length;const m=MQ.shift();
-    if(m.t==='roll'){if(!await until(SETTLED,40000)||phase!=='roll'||m.c!==players[cur])continue;sentRoll=false;await rollDice(m.v)}
+    if(m.t==='roll'){if(m.c===me.color&&selfRolls>0){selfRolls--;sentRoll=false;if(predicted.shift()!==m.v)desync();continue}   /* my own roll, already shown */
+      if(!await until(SETTLED,40000)||phase!=='roll'||m.c!==players[cur])continue;sentRoll=false;await rollDice(m.v)}
     else if(m.t==='move'){if(m.c===me.color&&selfMoves>0){selfMoves--;sentMove=false;continue}
       if(!await until(SETTLED,40000)||phase!=='move')continue;const c=players[cur];if(m.c!==c)continue;sentMove=false;
       if(!(m.i>=0&&m.i<4)||stepsList(c,T[c][m.i],roll)===null)continue;await doMove(c,m.i)}
@@ -986,6 +992,7 @@ class Room:
         self.started = False
         self.log = []               # ordered game messages (dicts)
         self.logj = []              # the same messages, already encoded as JSON text (sent / saved as-is)
+        self.next = {}              # colour -> that player's NEXT dice value (chosen now, told only to that player)
         self.rev = 0                # bumped on every change; lets the saver skip rooms that did not change
         self._saved = (-1, "")      # (rev, json text) of the last save of this room
         self.conns = {}             # client id -> [Queue, ...] (open WebSockets)
@@ -1015,6 +1022,14 @@ class Room:
         return next((c for c in COLORS if c not in self.seats), None)
 
     # ---- messaging ----
+    def deal(self, color):
+        """Pick this player's next dice value in advance and tell ONLY them. Their roll can then land the instant they
+        tap instead of waiting a network round trip. The server still decides the number; nobody else sees it."""
+        v = self.next[color] = RNG.randint(1, 6)
+        self.rev += 1
+        for q in self.conns.get(self.seats.get(color), []):
+            q.put('{"t":"next","v":%d}' % v)
+
     def _fanout(self, raw):
         for queues in self.conns.values():
             for q in queues:
@@ -1054,6 +1069,12 @@ class Room:
             for raw in self.logj[after:]:
                 q.put(raw)
             q.put('{"t":"synced"}')
+            col = self.color_of(cid)
+            if self.started and col:                      # (re)connecting player gets their current next value
+                if col not in self.next:
+                    self.next[col] = RNG.randint(1, 6)
+                    self.rev += 1
+                q.put('{"t":"next","v":%d}' % self.next[col])
             self.conns.setdefault(cid, []).append(q)
             self.seen[cid] = time.time()
         return q
@@ -1086,9 +1107,9 @@ def _room_json(r):
     """JSON text of one room. Re-encoded only when the room changed; the log reuses the already-encoded messages."""
     with r.lock:
         if r._saved[0] != r.rev:
-            text = '{"seats":%s,"names":%s,"host":%s,"started":%s,"touch":%s,"left":%s,"log":[%s]}' % (
+            text = '{"seats":%s,"names":%s,"host":%s,"started":%s,"touch":%s,"left":%s,"next":%s,"log":[%s]}' % (
                 json.dumps(r.seats), json.dumps(r.names), json.dumps(r.host), "true" if r.started else "false",
-                r.touch, json.dumps(sorted(r.left)), ",".join(r.logj))
+                r.touch, json.dumps(sorted(r.left)), json.dumps(r.next), ",".join(r.logj))
             r._saved = (r.rev, text)
         return r._saved[1]
 
@@ -1188,6 +1209,7 @@ def load_rooms():
         r.logj = [json.dumps(m, separators=COMPACT) for m in r.log]
         r.rev = 1
         r.left = set(d.get("left", []))
+        r.next = d.get("next", {})
         ROOMS[code] = r
 
 
@@ -1311,10 +1333,14 @@ def api_send(d):
                 w = msg.get("win")
                 r.append({"t": "start", "win": w if isinstance(w, int) and 1 <= w <= 4 else 4,
                           "players": [c for c in COLORS if c in r.seats]})
+                for c in list(r.seats):
+                    r.deal(c)
         elif not r.started:
             pass
         elif t == "roll":
-            r.append({"t": "roll", "c": color, "v": RNG.randint(1, 6)})
+            v = r.next.pop(color, None) or RNG.randint(1, 6)   # the value this player was already told
+            r.append({"t": "roll", "c": color, "v": v})
+            r.deal(color)                                        # and the one after it
         elif t == "move":
             i = msg.get("i")
             if isinstance(i, int) and 0 <= i < 4:
