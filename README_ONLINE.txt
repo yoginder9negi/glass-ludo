@@ -75,3 +75,11 @@ FUN EFFECTS: when a goti is cut, the killer turns into a cartoon hammer that sma
 GAME FROZE ("X is playing..." and nothing moves)?  Press the 🔄 Sync button (top-left, online games). Every phone rebuilds the game
 from the server's log and everyone continues from the same point. The game also heals itself: it detects lost messages, dead
 connections, phones waking up from sleep, and phones that disagree about the game, and re-syncs automatically.
+
+SLOW / LATE MOVES: the ping badge (bottom-right) is the round trip to your server. Under 150 ms feels instant.
+ A high number (e.g. 400 ms) is distance or a weak connection, not the game. Fix it by: (1) hosting in or near your country
+ (India: a VPS in Mumbai/Bangalore, Oracle Cloud free tier Mumbai, Fly.io 'bom', AWS/Google Mumbai), (2) Render region Singapore at least,
+ (3) Wi-Fi or strong 4G/5G, no VPN/data saver, (4) an always-on server (free Render sleeps when idle).
+
+EXTRA RULES: two players left, one never cut anybody and the other has all gotis in its home lane -> the other one walks home
+ automatically. Three sixes in a row -> a big thumbs-down falls on the player's start square.

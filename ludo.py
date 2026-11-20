@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GLASS LUDO v3.1 - web based, pure Python (no installs needed).
+GLASS LUDO v3.2 - web based, pure Python (no installs needed).
 Run:  python ludo.py
  - Computer: http://localhost:8000
  - Mobile  : open the "On your mobile" link printed in the terminal (same Wi-Fi)
@@ -10,6 +10,9 @@ Rules
  * Roll 6 to bring a token out. 6 / cutting a goti / reaching home = extra turn.
  * 3 sixes in a row = turn lost, all tokens go back to where they were.
  * First to bring all tokens home is 1st; play continues for 2nd, 3rd ... until one player is left.
+ * Two players left, one of them has not cut anybody (so can never enter home) and the other has all gotis in its home lane:
+   the other one's gotis walk home by themselves, no dice needed.
+ * Three sixes in a row: a big thumbs-down 👎 falls on the player's start square.
  * Online freeze? Press 🔄 Sync: every phone rebuilds the game from the server's log and resumes from the same point.
  * A token can NOT enter home until its player has cut at least one opponent
    token. Until then it skips the home lane and keeps circling the board.
@@ -124,6 +127,11 @@ input::placeholder{color:#ffffffaa}
 #rcode{width:130px;letter-spacing:4px;text-transform:uppercase}
 #rc{font-size:40px;font-weight:900;letter-spacing:8px;text-shadow:0 0 14px #ff7ae0}
 #skip{padding:8px 10px;font-size:13px}
+.thumb{position:absolute;z-index:14;pointer-events:none;display:flex;align-items:center;justify-content:center;border-radius:50%;
+  background:radial-gradient(circle,#ff2b2bcc 0,#ff2b2b44 52%,transparent 72%);animation:tdown 1.1s ease-in 2 both;filter:drop-shadow(0 4px 8px #000a)}
+@keyframes tdown{0%{transform:translate(-50%,-140%) scale(.2) rotate(-25deg);opacity:0}25%{transform:translate(-50%,-90%) scale(1.5) rotate(-10deg);opacity:1}
+  55%{transform:translate(-50%,10%) scale(1.8) rotate(8deg);opacity:1}70%{transform:translate(-50%,-10%) scale(1.6) rotate(-4deg)}
+  85%{transform:translate(-50%,40%) scale(1.7) rotate(4deg);opacity:1}100%{transform:translate(-50%,80%) scale(1.2) rotate(0);opacity:0}}
 #tl{position:fixed;top:8px;left:8px;z-index:6;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100vw - 150px)}
 #tl button{padding:5px 9px;font-size:11px;background:rgba(255,255,255,.18)}
 .toon{position:fixed;z-index:28;pointer-events:none;width:132px;opacity:0;transition:transform .4s cubic-bezier(.2,1.4,.4,1),opacity .25s;bottom:8px}
@@ -361,6 +369,7 @@ function sfxSix(){boost=2.6;const t=now();
     tone('sawtooth',b,b*1.55,s,.08,.3,1500);tone('sawtooth',b*1.55,b*.7,s+.07,.08,.28,1200);
     tone('square',b*.5,b*.8,s,.12,.12,900);tone('sawtooth',b*2,b*3,s,.07,.12,2600)}
   tone('sawtooth',500,1600,t+1.45,.7,.32,2200);tone('square',250,800,t+1.45,.7,.15,1200);tone('sine',90,55,t,1.9,.3,200);noise(t,.35,.3,4000);boost=1}
+function sfxBuzz(){boost=2;const t=now();tone('sawtooth',260,70,t,.7,.5,420);tone('square',130,55,t,.7,.3,250);boost=1}   /* sad buzzer for the thumbs-down */
 function sfxSorry(){boost=2.2;const t=now();
   tone('sine',1300,350,t,.55,.35,1800);   // cartoon slide-whistle drop
   tone('triangle',520,300,t+.6,.22,.35,1200);tone('triangle',460,260,t+.85,.22,.35,1100);tone('triangle',400,160,t+1.1,.6,.38,1000);   // "wah wah waaah"
@@ -648,6 +657,7 @@ function say(t){const c=players[cur];$('#st').innerHTML=`<div><b style="backgrou
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
 function startTurn(){if(phase==='over')return;markProg();
   if(isOut(players[cur])){phase='skip';busy=true;const g=gen;sleep(250).then(()=>{if(g===gen&&phase==='skip'){busy=false;nextTurn()}});return}
+  {const W=lockedWinner();if(W){autoHome(W);return}}
   phase='roll';busy=false;const c=players[cur];if(!ONLINE)saveLocal();
   $('#scene').style.setProperty('--pc',HEX[c]);$('#scene').style.setProperty('--pd',shade(HEX[c],.55));
   const mine=!ONLINE||c===me.color;
@@ -681,6 +691,10 @@ function choose(c,mv){let best=mv[0],bs=-1;mv.forEach(i=>{const p=T[c][i],l=step
 function startSpin(){spinning=true;const sc=$('#scene');sc.classList.remove('wait','six','sad');sc.classList.add('rolling');sc.style.animationDuration='1.2s';
   cube.style.transition='transform 1.6s linear';cube.style.transform=`${TILT} rotateX(1440deg) rotateY(1800deg)`;sfxRoll()}
 function stopSpin(){spinning=false;const sc=$('#scene');sc.classList.remove('rolling');sc.style.animationDuration='';cube.style.transition='none';cube.style.transform=`${TILT} rotateX(0deg) rotateY(0deg)`}
+function thumbsDown(c){   /* three sixes: a big 👎 falls on the player's start square */
+  if(FAST)return;const bd=$('#board'),cs=bd.getBoundingClientRect().width/N,[x,y]=PATH[START[c]],d=document.createElement('div');
+  d.className='thumb';d.style.cssText=`left:${(x+.5)*cs}px;top:${(y+.5)*cs}px;width:${cs*3.4}px;height:${cs*3.4}px;font-size:${cs*2.4}px`;d.textContent='👎';
+  bd.appendChild(d);sfxBuzz();setTimeout(()=>d.remove(),2400)}
 async function rollDice(forced){if(busy||phase!=='roll')return;busy=true;phase='rolling';const g=gen,sc=$('#scene'),c=players[cur];
   const was=spinning;spinning=false;A();sc.classList.remove('wait','six','sad');if(!was){sc.classList.add('rolling');sc.style.animationDuration=SP+'s';sfxRoll()}
   roll=forced||(1+Math.floor(Math.random()*6));
@@ -691,7 +705,7 @@ async function rollDice(forced){if(busy||phase!=='roll')return;busy=true;phase='
   sc.classList.remove('rolling');sc.style.animationDuration='';cube.style.transition='none';cube.style.transform=`${TILT} rotateX(${ax}deg) rotateY(${ay}deg)`;
   const mv=(roll===6&&sixCount===3)?[]:movable(c),useless=roll===6&&sixCount<3&&!mv.length;
   if(roll===6){if(useless){sc.classList.add('sad');sfxSorry();toast('😅 Ooops… Sorryy!')}else{sc.classList.add('six');sfxSix();flash('#ffd23f');burst(sc,60)}}
-  if(roll===6&&sixCount===3){toast('🚫 3 SIXES! Turn lost');say('rolled 3 sixes!');await sleep(1300);if(g!==gen)return;
+  if(roll===6&&sixCount===3){thumbsDown(c);toast('🚫 3 SIXES! Turn lost');say('rolled 3 sixes!');await sleep(1300);if(g!==gen)return;
     const s=JSON.parse(snap);players.forEach(p=>T[p]=s.T[p]);Object.assign(killed,s.killed);place(true);sixCount=0;await sleep(900);if(g!==gen)return;nextTurn();return}
   if(roll===6&&!useless)toast('🧙‍♀️ SIX! Hehehe!');
   if(!mv.length){say(`rolled ${roll} – no move`);await sleep(550);if(g!==gen)return;nextTurn();return}
@@ -723,6 +737,17 @@ async function doMove(c,i){if(busy||phase!=='move')return;const list=stepsList(c
     toast('🏅 '+pn(c)+' finished #'+finished.length);burst(tokEl[c][i],50);await sleep(900);if(g!==gen)return;nextTurn();return}
   if(extra)startTurn();else nextTurn()}
 
+/* ---- decided game: two players left, A has not cut anybody (so can never enter home) and B has every goti inside its home lane
+   (lane tokens cannot be cut). Nothing can change any more, so B's gotis walk into home by themselves - no dice. ---- */
+function lockedWinner(){const act=players.filter(c=>!isOut(c));if(act.length!==2)return null;
+  for(const B of act){const A=act[0]===B?act[1]:act[0];if(!killed[A]&&T[B].every(p=>p>=HB))return B}
+  return null}
+async function autoHome(B){
+  const g=gen,A=players.find(c=>c!==B&&!isOut(c));phase='auto';busy=true;markProg();
+  toast('🏠 '+pn(A)+' can never enter home – '+pn(B)+' goes home automatically');
+  for(let i=0;i<4;i++){while(T[B][i]<FIN_P){T[B][i]++;place();sfxTick();await sleep(130);if(g!==gen)return}await sleep(120);if(g!==gen)return}
+  sfxShehnai();showToon('toonR',3500);burst(tokEl[B][0],40);await sleep(600);if(g!==gen)return;
+  finished.push(B);yardNames();if(finished.length===1&&!FAST)celebrate();endGame(B)}
 function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');$('#quit').classList.add('hide');$('#sync').classList.add('hide');
   const fo=c=>{const k=finished.indexOf(c);return k<0?99:k},prog=c=>T[c].reduce((a,x)=>a+(x<0?0:x<HB?x:LAST+1+(x-HB)),0);
   const rows=players.map(c=>({c,h:T[c].filter(x=>x===FIN_P).length,p:prog(c)})).sort((a,b)=>fo(a.c)-fo(b.c)||b.h-a.h||b.p-a.p);
@@ -877,7 +902,7 @@ $('#sync').onclick=()=>{if(!ONLINE||!started||phase==='over')return;
 setInterval(()=>{   /* watchdog: if the game is stuck, heal it without anyone pressing anything */
   if(!ONLINE||!started||phase==='over'||document.hidden||Date.now()-lastResync<10000)return;
   const idle=Date.now()-lastProg;
-  if((MQ.length&&idle>20000)||(/^(rolling|moving|skip)$/.test(phase)&&idle>30000)||(outAt&&Date.now()-outAt>6000))resyncNow('watchdog')},4000);
+  if((MQ.length&&idle>20000)||(/^(rolling|moving|skip|auto)$/.test(phase)&&idle>30000)||(outAt&&Date.now()-outAt>6000))resyncNow('watchdog')},4000);
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){hiddenAt=Date.now();return}
   if(!ONLINE)return;lastPongAt=Date.now();
