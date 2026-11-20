@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GLASS LUDO v3 - web based, pure Python (no installs needed).
+GLASS LUDO v3.1 - web based, pure Python (no installs needed).
 Run:  python ludo.py
  - Computer: http://localhost:8000
  - Mobile  : open the "On your mobile" link printed in the terminal (same Wi-Fi)
@@ -10,6 +10,7 @@ Rules
  * Roll 6 to bring a token out. 6 / cutting a goti / reaching home = extra turn.
  * 3 sixes in a row = turn lost, all tokens go back to where they were.
  * First to bring all tokens home is 1st; play continues for 2nd, 3rd ... until one player is left.
+ * Online freeze? Press 🔄 Sync: every phone rebuilds the game from the server's log and resumes from the same point.
  * A token can NOT enter home until its player has cut at least one opponent
    token. Until then it skips the home lane and keeps circling the board.
  * Exact number needed to reach the final home.
@@ -123,8 +124,8 @@ input::placeholder{color:#ffffffaa}
 #rcode{width:130px;letter-spacing:4px;text-transform:uppercase}
 #rc{font-size:40px;font-weight:900;letter-spacing:8px;text-shadow:0 0 14px #ff7ae0}
 #skip{padding:8px 10px;font-size:13px}
-#tl{position:fixed;top:8px;left:8px;z-index:6;display:flex;gap:6px}
-#tl button{padding:5px 10px;font-size:12px;background:rgba(255,255,255,.18)}
+#tl{position:fixed;top:8px;left:8px;z-index:6;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100vw - 150px)}
+#tl button{padding:5px 9px;font-size:11px;background:rgba(255,255,255,.18)}
 .toon{position:fixed;z-index:28;pointer-events:none;width:132px;opacity:0;transition:transform .4s cubic-bezier(.2,1.4,.4,1),opacity .25s;bottom:8px}
 #toonL{left:4px;transform:translateX(-170%)}
 #toonR{right:4px;transform:translateX(170%)}
@@ -206,7 +207,7 @@ body.lite .dm svg{filter:none}
   <button id="skip" class="hide" title="Skip absent player">⏭</button><button id="snd">🔊</button>
 </div>
 <div id="stamp">✍️ Developed by Yoginder Singh Negi</div>
-<div id="tools"><button id="lite"></button><button id="spd"></button></div><div id="tl"><button id="quit" class="hide">🚪 Quit</button><button id="fin" class="hide">🏁 Finish</button></div><div id="net" class="hide"></div>
+<div id="tools"><button id="lite"></button><button id="spd"></button></div><div id="tl"><button id="quit" class="hide">🚪 Quit</button><button id="fin" class="hide">🏁 Finish</button><button id="sync" class="hide" title="Refresh the game for all players">🔄 Sync</button></div><div id="net" class="hide"></div>
 <div id="toonL" class="toon"><div class="bub">Chal haat! 🥁</div><svg viewBox="0 0 120 120"><g class="dh">
   <path d="M28 120 Q28 76 60 76 Q92 76 92 120Z" fill="#ff8c1a"/>
   <ellipse cx="60" cy="98" rx="40" ry="14" fill="#8b4a1c"/>
@@ -416,7 +417,7 @@ function sfxThud(){if(muted||FAST)return;const t=now();tone('sine',210,70,t,.16,
    hops beside it, winds up slowly and smashes it. trail = [[x,y],...] board-cell coordinates of the squares crossed. */
 async function hammerHit(c,i,v,onHit,after,trail){
   if(FAST||!trail||trail.length<2){onHit&&onHit();after&&after();return}
-  const bd=$('#board'),br=bd.getBoundingClientRect(),W=br.width,cs=W/N,kel=tokEl[c][i],vs=v.map(([o,j])=>tokEl[o][j]),K=ms=>ms*KILL_SLOW;
+  const g0=gen,bd=$('#board'),br=bd.getBoundingClientRect(),W=br.width,cs=W/N,kel=tokEl[c][i],vs=v.map(([o,j])=>tokEl[o][j]),K=ms=>ms*KILL_SLOW;
   const ctr=el=>{const r=el.getBoundingClientRect();return[r.left+r.width/2-br.left,r.top+r.height/2-br.top,r.width]};
   const [vx,vy,sz]=ctr(vs[0]),S=sz*HAMMER_SIZE,R=.76*S;
   const dir=(br.left+vx+1.45*S<=innerWidth)?1:-1;            /* strike from the right side unless the screen edge is too near */
@@ -435,23 +436,23 @@ async function hammerHit(c,i,v,onHit,after,trail){
   kel.style.visibility='hidden';                              /* the killer goti turns into the hammer */
   /* 1) hammer pops out of the goti */
   sq.animate([{transform:'scale(.2)',opacity:0},{transform:'scale(1.15)',opacity:1,offset:.6},{transform:'scale(1)',opacity:1}],{duration:K(160),easing:'ease-out',fill:'forwards'});
-  await rs(K(170));
+  await rs(K(170));if(g0!==gen){fx.remove();return}   /* the game was rebuilt (Sync) meanwhile: drop this old animation, never touch the new game */
   /* 2) hop square by square until it stands on the victim's square */
   const hop=async(a,b,dur,arc)=>{
     w.animate([{transform:at(a),easing:'ease-out'},{transform:`translate(${(a[0]+b[0])/2}px,${(a[1]+b[1])/2-arc}px)`,offset:.5,easing:'ease-in'},{transform:at(b)}],{duration:dur,fill:'forwards'});
     sq.animate([{transform:'scale(1,1)'},{transform:'scale(.9,1.12)',offset:.5},{transform:'scale(1,1)'}],{duration:dur});
     await rs(dur);w.style.transform=at(b);sfxTick();sfxThud();
     sq.animate([{transform:'scale(1.14,.84)'},{transform:'scale(1,1)'}],{duration:K(110)})};
-  for(let k=1;k<pts.length;k++){await hop(pts[k-1],pts[k],K(200),cs*1.1)}
+  for(let k=1;k<pts.length;k++){await hop(pts[k-1],pts[k],K(200),cs*1.1);if(g0!==gen){fx.remove();return}}
   /* 3) last little hop beside the victim, to take the striking position */
   await rs(K(90));
   await hop(pts[pts.length-1],strike,K(240),cs*.9);
   await rs(K(120));
   /* 4) slow wind-up, tense pause, slow smash */
   h.animate([{transform:rot(0)},{transform:rot(62),offset:.3,easing:'ease-in-out'},{transform:rot(62),offset:.5,easing:'ease-in'},{transform:rot(-90)}],{duration:K(1000),fill:'forwards'});
-  await rs(K(1000));
+  await rs(K(1000));if(g0!==gen){fx.remove();return}
   /* 5) impact, in slow motion */
-  onHit&&onHit();sfxThud();
+  if(onHit)onHit();sfxThud();
   const sh=dir*6;
   bd.animate([{transform:'translate(0,0)'},{transform:`translate(${-sh}px,4px)`},{transform:`translate(${sh}px,-4px)`},{transform:`translate(${-sh*.6}px,2px)`},{transform:'translate(0,0)'}],{duration:K(300)});
   burst(ghosts[0],26,['#fff','#ffd23f','#ff4d6d']);
@@ -461,7 +462,7 @@ async function hammerHit(c,i,v,onHit,after,trail){
     {transform:'translate(-50%,-30%) scale(1.6,.18)',offset:.6},{transform:'translate(-50%,-260%) scale(.2) rotate(500deg)',opacity:0}],{duration:gd,fill:'forwards'}));
   w.animate([{opacity:1},{opacity:1,offset:.55},{opacity:0}],{duration:gd,fill:'forwards'});
   await rs(gd*.95);
-  ghosts.forEach(gh=>gh.remove());after&&after();vs.forEach(el=>el.style.visibility='');kel.style.visibility='';
+  ghosts.forEach(gh=>gh.remove());if(g0===gen&&after)after();vs.forEach(el=>el.style.visibility='');kel.style.visibility='';
   await rs(K(60));fx.remove()}
 
 /* ===== cartoon dhol boy: appears in the goti's yard whenever a goti comes out of it ===== */
@@ -533,10 +534,10 @@ const clearDholBoys=()=>document.querySelectorAll('.dm').forEach(e=>e.remove());
 $('#snd').onpointerdown=e=>{e.preventDefault();muted=!muted;$('#snd').textContent=muted?'🔇':'🔊'};
 
 /* ---------- effects ---------- */
-function toast(txt){const t=$('#toast');t.textContent=txt;t.classList.remove('show');void t.offsetWidth;t.classList.add('show')}
-function flash(col){const d=document.createElement('div');Object.assign(d.style,{position:'fixed',inset:0,zIndex:25,pointerEvents:'none',background:`radial-gradient(circle,${col}99,transparent 70%)`});
+function toast(txt){if(FAST)return;const t=$('#toast');t.textContent=txt;t.classList.remove('show');void t.offsetWidth;t.classList.add('show')}
+function flash(col){if(FAST)return;const d=document.createElement('div');Object.assign(d.style,{position:'fixed',inset:0,zIndex:25,pointerEvents:'none',background:`radial-gradient(circle,${col}99,transparent 70%)`});
   document.body.appendChild(d);d.animate([{opacity:0},{opacity:1},{opacity:0}],{duration:700}).onfinish=()=>d.remove()}
-function burst(el,n=36,cols=Object.values(HEX)){n=Math.min(n,28);const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+function burst(el,n=36,cols=Object.values(HEX)){if(FAST)return;n=Math.min(n,28);const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
   for(let i=0;i<n;i++){const p=document.createElement('div');
     Object.assign(p.style,{position:'fixed',left:cx+'px',top:cy+'px',width:'10px',height:'10px',borderRadius:'50%',background:cols[i%cols.length],zIndex:40,pointerEvents:'none'});
     document.body.appendChild(p);const a=Math.random()*6.28,d=60+Math.random()*150;
@@ -545,7 +546,8 @@ function burst(el,n=36,cols=Object.values(HEX)){n=Math.min(n,28);const r=el.getB
 /* ---------- game state ---------- */
 let mode={red:'human',green:'off',yellow:'cpu',blue:'off'},players=[],T={},killed={},cur=0,roll=0,phase='idle',busy=false,gen=0,sixCount=0,snap=null;
 let gameT0=0,statDone=false,gameNames={},finished=[];
-let leftSet=new Set(),ONLINE=false,me={},names={},lastN=0,sentRoll=false,sentMove=false,onlineOn=[],started=false,lobbySeats={},lobbyHost='',es=null,BASE='',pollGen=0,synced=false,WINN=4,ws=null,spinning=false,selfMoves=0;
+let leftSet=new Set(),ONLINE=false,me={},names={},lastN=0,sentRoll=false,sentMove=false,onlineOn=[],started=false,lobbySeats={},lobbyHost='',BASE='',pollGen=0,synced=false,WINN=4,ws=null,spinning=false,selfMoves=0,
+  qgen=0,appliedN=0,lastBeacon='',polling=false,lastProg=Date.now(),lastResync=0,outAt=0,lastPongAt=0,hiddenAt=0;   /* qgen: current queue worker; outAt: when my oldest unconfirmed action was sent */
 function normBase(v){v=(v||'').trim();if(!v)return'';try{return new URL(/^https?:\/\//i.test(v)?v:((/^(\d+\.\d+\.\d+\.\d+|localhost)/.test(v)?'http://':'https://')+v)).origin}catch(e){return''}}
 if(location.protocol==='file:'){try{BASE=normBase(localStorage.getItem('ludoServer'))}catch(e){}}
 const tokEl={};
@@ -603,7 +605,7 @@ $('#go').onclick=()=>{COLORS.forEach(c=>mode[c]=$('#m_'+c).value);
   A();$('#setup').classList.add('hide');newGame()};
 $('#again').onclick=()=>{$('#win').classList.add('hide');$('#setup').classList.remove('hide')};
 
-function newGame(res){gen++;gameT0=Date.now();statDone=false;gameNames=Object.assign({},names);phase='idle';leftSet.clear();$('#quit').classList.remove('hide');$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();
+function newGame(res){gen++;markProg();gameT0=Date.now();statDone=false;gameNames=Object.assign({},names);phase='idle';leftSet.clear();$('#quit').classList.remove('hide');$('#sync').classList.toggle('hide',!ONLINE);$('#fin').classList.toggle('hide',ONLINE&&!me.host);Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();
   T={};killed={};finished=res&&res.finished?res.finished.slice():[];
   players.forEach(c=>{T[c]=res?res.T[c]:[-1,-1,-1,-1];killed[c]=res?!!res.killed[c]:false;tokEl[c]=[0,1,2,3].map(i=>{const e=document.createElement('div');e.className='tk';
     e.style.width=e.style.height=(100/N*.92)+'%';
@@ -644,8 +646,8 @@ function yardNames(){COLORS.forEach(c=>{const e=yardNm[c];if(!e)return;const on=
 const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 cut a goti to open home';
 function say(t){const c=players[cur];$('#st').innerHTML=`<div><b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small></div>`}
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
-function startTurn(){if(phase==='over')return;
-  if(isOut(players[cur])){phase='skip';busy=true;const g=gen;setTimeout(()=>{if(g===gen&&phase==='skip'){busy=false;nextTurn()}},250*SP);return}
+function startTurn(){if(phase==='over')return;markProg();
+  if(isOut(players[cur])){phase='skip';busy=true;const g=gen;sleep(250).then(()=>{if(g===gen&&phase==='skip'){busy=false;nextTurn()}});return}
   phase='roll';busy=false;const c=players[cur];if(!ONLINE)saveLocal();
   $('#scene').style.setProperty('--pc',HEX[c]);$('#scene').style.setProperty('--pd',shade(HEX[c],.55));
   const mine=!ONLINE||c===me.color;
@@ -653,12 +655,12 @@ function startTurn(){if(phase==='over')return;
   $('#scene').classList.remove('six','sad');$('#scene').classList.toggle('wait',mode[c]==='human'&&mine);updSkip();
   if(mode[c]==='cpu'){const g=gen;setTimeout(()=>{if(g===gen)rollDice()},550*SP)}}
 let nextRoll=0,selfRolls=0;const predicted=[];   /* nextRoll: the server told me my next number in advance */
-function desync(){toast('⚠ Out of sync - reloading');try{sessionStorage.setItem('autoResume','1')}catch(e){}setTimeout(()=>location.reload(),800)}
-$('#scene').onpointerdown=e=>{e.preventDefault();A();
-  if(ONLINE){if(phase==='roll'&&players[cur]===me.color&&!sentRoll){sentRoll=true;
-    if(nextRoll>=1&&nextRoll<=6){const v=nextRoll;nextRoll=0;selfRolls++;predicted.push(v);setTimeout(()=>{sentRoll=false},6000);post({t:'roll'});rollDice(v)}   /* dice starts at once; the server's echo only confirms it */
+function tapDice(){
+  if(ONLINE){if(ready()&&phase==='roll'&&!busy&&players[cur]===me.color&&!sentRoll){sentRoll=true;
+    if(nextRoll>=1&&nextRoll<=6){const v=nextRoll;nextRoll=0;selfRolls++;predicted.push(v);outAt=outAt||Date.now();setTimeout(()=>{sentRoll=false},6000);post({t:'roll'});rollDice(v)}   /* dice starts at once; the server's echo only confirms it */
     else{startSpin();setTimeout(()=>{sentRoll=false;if(spinning)stopSpin()},6000);post({t:'roll'})}}return}
-  if(phase==='roll'&&mode[players[cur]]==='human')rollDice()};
+  if(phase==='roll'&&mode[players[cur]]==='human')rollDice()}
+$('#scene').onpointerdown=e=>{e.preventDefault();A();tapDice()};
 
 /* tap anywhere near a glowing token to move it */
 $('#board').addEventListener('pointerdown',e=>{if(phase!=='move')return;const c=players[cur];if(mode[c]!=='human'||(ONLINE&&c!==me.color))return;
@@ -697,12 +699,12 @@ async function rollDice(forced){if(busy||phase!=='roll')return;busy=true;phase='
   if(mode[c]==='cpu'){await sleep(350);if(g!==gen)return;doMove(c,choose(c,mv))}
   else{const mine=!ONLINE||c===me.color,auto=mv.length===1||mv.every(i=>T[c][i]===T[c][mv[0]]);
     say(mine?`rolled ${roll} – tap a goti`:`rolled ${roll}`);if(mine)mv.forEach(i=>tokEl[c][i].classList.add('can'));
-    if(ONLINE){if(mine&&auto)setTimeout(()=>{if(g===gen&&phase==='move')sendMove(mv[0])},450*SP)}
+    if(ONLINE){if(mine&&auto)setTimeout(()=>{if(g===gen&&phase==='move'&&players[cur]===c)sendMove(mv[0])},450*SP)}
     else if(auto){await sleep(450);if(g===gen&&phase==='move')doMove(c,mv[0])}}}
 
-async function doMove(c,i){if(busy||phase!=='move')return;busy=true;phase='moving';const g=gen;
+async function doMove(c,i){if(busy||phase!=='move')return;const list=stepsList(c,T[c][i],roll);if(!list)return;busy=true;phase='moving';const g=gen;
   tokEl[c].forEach(e=>e.classList.remove('can'));
-  const list=stepsList(c,T[c][i],roll);let warned=false;
+  let warned=false;
   const fromYard=T[c][i]<0,willKill=victims(c,list[list.length-1]).length>0,trail=[coord(c,i,T[c][i])];
   for(const np of list){const prev=T[c][i];
     if(prev>=0&&prev<HB&&prev%R===LAST&&!killed[c]&&!warned){warned=true;toast('🔒 Cut a goti first!')}
@@ -715,13 +717,13 @@ async function doMove(c,i){if(busy||phase!=='move')return;busy=true;phase='movin
     await hammerHit(c,i,v,()=>{sfxKill();showToon('toonL',2900);flash('#ffb000');toast('🥁 Chal haat!')},()=>{v.forEach(([o,j])=>T[o][j]=-1);killed[c]=true;place()},trail);
     if(g!==gen)return;
     burst(tokEl[c][i],50,[HEX[c],'#fff','#ffd23f']);extra=true;await sleep(600);if(g!==gen)return}
-  if(np===FIN_P){sfxShehnai();showToon('toonR',3500);toast('🏠 Griha Pravesh!');burst(tokEl[c][i],40);extra=true;await sleep(400)}
+  if(np===FIN_P){sfxShehnai();showToon('toonR',3500);toast('🏠 Griha Pravesh!');burst(tokEl[c][i],40);extra=true;await sleep(400);if(g!==gen)return}
   if(T[c].filter(x=>x===FIN_P).length>=WINN&&!finished.includes(c)){finished.push(c);yardNames();if(finished.length===1&&!FAST)celebrate();   /* first finisher only: clip + fireworks. ranked 1st, 2nd... game goes on until one player is left */
     if(players.filter(q=>!isOut(q)).length<=1){endGame(c);return}
     toast('🏅 '+pn(c)+' finished #'+finished.length);burst(tokEl[c][i],50);await sleep(900);if(g!==gen)return;nextTurn();return}
   if(extra)startTurn();else nextTurn()}
 
-function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');$('#quit').classList.add('hide');
+function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');$('#quit').classList.add('hide');$('#sync').classList.add('hide');
   const fo=c=>{const k=finished.indexOf(c);return k<0?99:k},prog=c=>T[c].reduce((a,x)=>a+(x<0?0:x<HB?x:LAST+1+(x-HB)),0);
   const rows=players.map(c=>({c,h:T[c].filter(x=>x===FIN_P).length,p:prog(c)})).sort((a,b)=>fo(a.c)-fo(b.c)||b.h-a.h||b.p-a.p);
   if(w0&&!finished.length){const wi=rows.findIndex(r=>r.c===w0);if(wi>0)rows.unshift(rows.splice(wi,1)[0])}
@@ -734,7 +736,7 @@ function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.
 $('#quit').onclick=()=>{if(!confirm(ONLINE?'Quit this game? You leave your seat and the others carry on.':'Quit this game and go back to the menu?'))return;
   recQuit();
   if(ONLINE){const x={room:me.room,id:me.id};leaveOnline();api('/api/leave',x)}else clearLocal();
-  gen++;phase='idle';busy=true;['#fin','#quit','#skip','#win'].forEach(q=>$(q).classList.add('hide'));
+  gen++;phase='idle';busy=true;['#fin','#quit','#sync','#skip','#win'].forEach(q=>$(q).classList.add('hide'));
   Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();$('#st').textContent='';
   $('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide');$('#setup').classList.remove('hide')};
 $('#fin').onclick=()=>{if(phase==='over')return;if(!confirm('Finish the game now and show the result?'))return;if(ONLINE)post({t:'finish'});else endGame()};
@@ -753,39 +755,42 @@ function post(msg){if(ws&&ws.readyState===1){try{ws.send(JSON.stringify(msg));re
 async function postHTTP(msg,tries=3){for(let i=0;i<tries;i++){
     try{const r=await fetch(BASE+'/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:me.room,id:me.id,msg})});if(r.ok)return}catch(e){}
     await rs(500*(i+1))}
-  toast('⚠ Connection problem - resyncing');if(msg.t==='move'||(msg.t==='roll'&&selfRolls>0)){try{sessionStorage.setItem('autoResume','1')}catch(e){}setTimeout(()=>location.reload(),1200)}}
-function sendMove(i){if(sentMove||phase!=='move')return;sentMove=true;setTimeout(()=>sentMove=false,6000);selfMoves++;post({t:'move',i});doMove(me.color,i)}   // moves instantly on your screen
+  toast('⚠ Connection problem - resyncing');if(msg.t==='move'||(msg.t==='roll'&&selfRolls>0))resyncNow('send failed')}
+function sendMove(i){if(sentMove||!ready()||phase!=='move'||players[cur]!==me.color||!stepsList(me.color,T[me.color][i],roll))return;sentMove=true;setTimeout(()=>sentMove=false,6000);selfMoves++;outAt=outAt||Date.now();post({t:'move',i});doMove(me.color,i)}   // moves instantly on your screen
 const onErr=t=>{$('#onErr').textContent=t||''};
 const inviteUrl=()=>`${BASE||location.origin}/?room=${me.room}`;
 function enter(res){if(res.error){onErr(res.error);return}
-  nextRoll=0;selfRolls=0;predicted.length=0;
+  nextRoll=0;selfRolls=0;predicted.length=0;outAt=0;
   ONLINE=true;me={id:res.id,color:res.color,room:res.room,host:false};lastN=0;started=false;names={};
   try{localStorage.setItem('ludoSess',JSON.stringify({room:me.room,id:me.id,name:$('#pname').value.trim()}))}catch(e){}
   $('#onJoin').classList.add('hide');$('#onLobby').classList.remove('hide');$('#rc').textContent=me.room;connect()}
 function connect(){pollGen++;synced=false;FAST=true;openWS(pollGen);pingLoop(pollGen)}
 let wsFails=0;
 function openWS(g){let opened=false,w;
-  try{w=new WebSocket(`${(BASE||location.origin).replace(/^http/,'ws')}/ws?room=${me.room}&id=${me.id}&after=${lastN}`)}catch(e){ws=null;pollLoop(g);return}
+  try{w=new WebSocket(`${(BASE||location.origin).replace(/^http/,'ws')}/ws?room=${me.room}&id=${me.id}&after=${lastN}`)}catch(e){ws=null;startPoll(g);return}
   ws=w;
-  const fb=setTimeout(()=>{if(!opened&&g===pollGen){try{w.close()}catch(e){}ws=null;pollLoop(g)}},4500);   // WebSocket blocked -> use long-poll instead
-  w.onopen=()=>{opened=true;wsFails=0;clearTimeout(fb);onErr('')};
-  w.onmessage=e=>{const d=JSON.parse(e.data);if(d.t==='pong'){gotPong(d.ts);return}if(d.t==='next'){nextRoll=d.v;return}if(d.n){if(d.n<=lastN)return;lastN=d.n}handle(d)};
+  const fb=setTimeout(()=>{if(!opened&&g===pollGen){try{w.close()}catch(e){}ws=null;startPoll(g)}},4500);   // WebSocket blocked -> use long-poll instead
+  w.onopen=()=>{opened=true;wsFails=0;lastPongAt=Date.now();clearTimeout(fb);onErr('')};
+  w.onmessage=e=>{if(g!==pollGen)return;let d;try{d=JSON.parse(e.data)}catch(x){return}if(d.t==='pong'){gotPong(d.ts);return}if(d.t==='next'){nextRoll=d.v;return}if(d.n){if(d.n<=lastN)return;lastN=d.n}handle(d)};
   w.onclose=()=>{clearTimeout(fb);if(g!==pollGen||!ONLINE||ws!==w)return;ws=null;if(opened){onErr('Reconnecting…');setTimeout(()=>{if(g===pollGen&&ONLINE)openWS(g)},Math.min(600*2**wsFails++,8000))}}}
 const rs=ms=>new Promise(r=>setTimeout(r,ms));
 const RTT=[];
 function showNet(ms){const e=$('#net');e.classList.remove('hide');e.textContent=(ms<200?'🟢 ':ms<400?'🟡 ':'🔴 ')+ms+' ms'}
-function gotPong(ts){RTT.push(Math.round(performance.now()-ts));if(RTT.length>5)RTT.shift();showNet([...RTT].sort((a,b)=>a-b)[RTT.length>>1])}   /* median of the last 5 = steady number */
+function gotPong(ts){lastPongAt=Date.now();RTT.push(Math.round(performance.now()-ts));if(RTT.length>5)RTT.shift();showNet([...RTT].sort((a,b)=>a-b)[RTT.length>>1])}   /* median of the last 5 = steady number */
 async function pingLoop(g){
   while(g===pollGen&&ONLINE){
     if(document.hidden){await rs(4000);continue}
-    if(ws&&ws.readyState===1){try{ws.send(JSON.stringify({t:'ping',ts:performance.now()}))}catch(x){}await rs(4000);continue}   /* real game-connection round trip, no HTTP/TLS overhead */
+    if(ws&&ws.readyState===1){
+      if(Date.now()-lastPongAt>12000){const w=ws;ws=null;try{w.close()}catch(x){}onErr('Reconnecting…');openWS(g);await rs(1000);continue}   /* no answer for 12 s = dead link (phone changed network): reconnect now */
+      try{ws.send(JSON.stringify({t:'ping',ts:performance.now()}))}catch(x){}await rs(4000);continue}   /* real game-connection round trip, no HTTP/TLS overhead */
     const t=performance.now();
     try{await fetch(BASE+'/health',{cache:'no-store'});showNet(Math.round(performance.now()-t))}   /* long-poll fallback only */
     catch(x){const e=$('#net');e.classList.remove('hide');e.textContent='🔴 offline'}
     await rs(10000)}
   $('#net').classList.add('hide')}
+function startPoll(g){if(polling)return;polling=true;pollLoop(g).finally(()=>{polling=false})}
 async function pollLoop(g){let fails=0;
-  while(g===pollGen&&ONLINE){
+  while(g===pollGen&&ONLINE&&!(ws&&ws.readyState===1)){
     try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),32000);
       const r=await fetch(`${BASE}/api/poll?room=${me.room}&id=${me.id}&after=${lastN}`,{signal:ctl.signal,cache:'no-store'});clearTimeout(to);
       const j=await r.json();if(g!==pollGen)return;
@@ -800,8 +805,9 @@ function handle(d){
   else if(d.t==='presence'){onlineOn=d.on;renderSeats();updSkip()}
   else if(d.t==='synced'){synced=true;if(!qrun&&!MQ.length)FAST=false}
   else if(d.t==='closed'){leaveOnline();onErr('The host closed this room.');$('#win').classList.add('hide');$('#online').classList.remove('hide');$('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide')}
-  else if(d.t==='start'){selfMoves=0;WINN=d.win||4;players=d.players;mode={red:'off',green:'off',yellow:'off',blue:'off'};players.forEach(c=>mode[c]='human');started=true;
+  else if(d.t==='start'){appliedN=d.n||0;selfMoves=selfRolls=0;predicted.length=0;outAt=0;WINN=d.win||4;players=d.players;mode={red:'off',green:'off',yellow:'off',blue:'off'};players.forEach(c=>mode[c]='human');started=true;
     MQ.length=0;$('#online').classList.add('hide');$('#setup').classList.add('hide');$('#win').classList.add('hide');newGame()}
+  else if(d.t==='resync'){if(!FAST&&synced&&Date.now()-lastResync>8000)resyncNow('requested by '+pn(d.c))}   /* someone pressed Sync (ignored while replaying, and by the phone that pressed it) */
   else if(d.t==='roll'||d.t==='move'||d.t==='skip'||d.t==='finish'||d.t==='left'){MQ.push(d);if(!qrun)runQ()}}
 function renderPick(){const b=$('#pick');b.innerHTML='';['red','green','blue','yellow'].forEach(c=>{const x=document.createElement('button');
   const taken=!!lobbySeats[c]&&c!==me.color;x.style.cssText=`background:${HEX[c]};border:3px solid ${c===me.color?'#fff':'transparent'};border-radius:14px;opacity:${taken?.25:1}`;
@@ -820,20 +826,64 @@ function renderSeats(){const box=$('#seats');box.innerHTML='';COLORS.forEach(c=>
   l.append(dot,nm);r.append(l,on);box.appendChild(r)})}
 async function until(f,ms=12000){const t=Date.now();while(!f()){if(Date.now()-t>ms)return false;await sleep(30)}return true}
 const SETTLED=()=>(phase==='roll'&&!busy)||phase==='move'||phase==='over'||phase==='idle';
-async function runQ(){qrun=true;
-  while(MQ.length){BACKLOG=MQ.length;const m=MQ.shift();
-    if(m.t==='roll'){if(m.c===me.color&&selfRolls>0){selfRolls--;sentRoll=false;if(predicted.shift()!==m.v)desync();continue}   /* my own roll, already shown */
-      if(!await until(SETTLED,40000)||phase!=='roll'||m.c!==players[cur])continue;sentRoll=false;await rollDice(m.v)}
-    else if(m.t==='move'){if(m.c===me.color&&selfMoves>0){selfMoves--;sentMove=false;continue}
-      if(!await until(SETTLED,40000)||phase!=='move')continue;const c=players[cur];if(m.c!==c)continue;sentMove=false;
-      if(!(m.i>=0&&m.i<4)||stepsList(c,T[c][m.i],roll)===null)continue;await doMove(c,m.i)}
-    else if(m.t==='skip'){if(await until(()=>phase==='roll'&&!busy))nextTurn()}
-    else if(m.t==='left'){leftSet.add(m.c);yardNames();const alive=players.filter(c=>!isOut(c));
-      if(alive.length<=1){await until(()=>phase==='roll'||phase==='move'||phase==='over'||phase==='skip',8000);if(phase!=='over')endGame(alive[0])}
-      else if(players[cur]===m.c){await until(()=>phase==='roll'||phase==='move'||phase==='over',8000);
-        if(players[cur]===m.c&&(phase==='roll'||phase==='move')){tokEl[m.c].forEach(e=>e.classList.remove('can'));nextTurn()}}}
-    else if(m.t==='finish'){await until(()=>phase==='roll'||phase==='move'||phase==='over',8000);if(phase!=='over')endGame()}}
-  qrun=false;BACKLOG=0;if(synced)FAST=false}
+/* ---- the message queue: every phone applies the same messages, in the same order ---- */
+function markProg(){lastProg=Date.now()}
+const ready=()=>synced&&!FAST&&!MQ.length;      /* caught up with the server's log: only then may this phone act */
+async function runQ(){qrun=true;const my=qgen;
+  while(my===qgen&&MQ.length){BACKLOG=MQ.length;const m=MQ.shift();
+    try{await applyMsg(m,my)}catch(e){console.error('game message failed',m,e);resyncNow('error')}   /* one bad message must never freeze the game: rebuild from the log */
+    if(my===qgen)appliedN=m.n;markProg()}
+  if(my===qgen){qrun=false;BACKLOG=0;if(synced)FAST=false;setTimeout(beacon,0)}}
+async function applyMsg(m,my){   /* my = which queue worker called us; after a Sync the old worker must never touch the rebuilt game */
+  const stale=()=>my!==qgen;
+  if(m.t==='roll'){
+    if(m.c===me.color&&selfRolls>0){selfRolls--;sentRoll=false;if(!selfRolls&&!selfMoves)outAt=0;if(predicted.shift()!==m.v)resyncNow('dice mismatch');return}   /* my own roll, already shown */
+    if(!await until(SETTLED,40000)){if(!stale())resyncNow('queue stuck');return}
+    if(stale()||phase!=='roll'||m.c!==players[cur])return;
+    sentRoll=false;await rollDice(m.v)}
+  else if(m.t==='move'){
+    if(m.c===me.color&&selfMoves>0){selfMoves--;sentMove=false;if(!selfRolls&&!selfMoves)outAt=0;return}
+    if(!await until(SETTLED,40000)){if(!stale())resyncNow('queue stuck');return}
+    if(stale()||phase!=='move')return;const c=players[cur];if(m.c!==c)return;sentMove=false;
+    if(!(m.i>=0&&m.i<4)||stepsList(c,T[c][m.i],roll)===null)return;await doMove(c,m.i)}
+  else if(m.t==='skip'){if(await until(()=>phase==='roll'&&!busy,40000)){if(!stale())nextTurn()}else if(!stale())resyncNow('queue stuck')}
+  else if(m.t==='left'){leftSet.add(m.c);yardNames();const alive=players.filter(c=>!isOut(c));
+    if(alive.length<=1){await until(()=>phase==='roll'||phase==='move'||phase==='over'||phase==='skip',30000);if(!stale()&&phase!=='over')endGame(alive[0])}
+    else if(players[cur]===m.c){await until(()=>phase==='roll'||phase==='move'||phase==='over',30000);
+      if(!stale()&&players[cur]===m.c&&(phase==='roll'||phase==='move')){tokEl[m.c].forEach(e=>e.classList.remove('can'));nextTurn()}}}
+  else if(m.t==='finish'){await until(()=>phase==='roll'||phase==='move'||phase==='over',30000);if(!stale()&&phase!=='over')endGame()}}
+
+/* ---- self-healing: rebuild this phone from the server's log. Every phone replays the same log, so all end up identical ---- */
+function resyncNow(why){
+  if(!ONLINE||!started)return;
+  lastResync=Date.now();console.log('resync:',why);toast('🔄 Syncing…');
+  qgen++;qrun=false;MQ.length=0;gen++;                       /* the old queue worker and any animation in flight stop */
+  selfMoves=selfRolls=0;predicted.length=0;nextRoll=0;sentRoll=sentMove=false;outAt=0;if(spinning)stopSpin();
+  lastN=0;appliedN=0;lastBeacon='';started=false;phase='idle';busy=true;leftSet.clear();finished=[];
+  Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();
+  if(ws){const w=ws;ws=null;try{w.close()}catch(e){}}
+  connect()}                                                 /* reconnect from message 0: the server replays everything fast, then we are live again */
+/* ---- safety net: at every turn boundary each phone sends a short fingerprint of its game. If two phones disagree about the same point
+   in the game, the server asks everybody to rebuild from the log - so a silent difference can never turn into a freeze ---- */
+function stateHash(){const o=JSON.stringify([players.map(c=>T[c]),cur,finished,players.map(c=>!!killed[c]),[...leftSet].sort()]);
+  let h=5381;for(let i=0;i<o.length;i++)h=((h<<5)+h+o.charCodeAt(i))|0;return(h>>>0).toString(36)}
+function beacon(){if(!ONLINE||!started||phase!=='roll'||busy||qrun||!ready()||selfRolls||selfMoves||!appliedN||!ws||ws.readyState!==1)return;
+  const h=stateHash(),k=appliedN+':'+h;if(k===lastBeacon)return;lastBeacon=k;
+  try{ws.send(JSON.stringify({t:'chk',n:appliedN,h}))}catch(e){}}
+setInterval(beacon,3000);
+$('#sync').onclick=()=>{if(!ONLINE||!started||phase==='over')return;
+  if(!confirm('Refresh the game for ALL players? Everyone continues from the same point.'))return;
+  post({t:'resync'});resyncNow('button')};
+setInterval(()=>{   /* watchdog: if the game is stuck, heal it without anyone pressing anything */
+  if(!ONLINE||!started||phase==='over'||document.hidden||Date.now()-lastResync<10000)return;
+  const idle=Date.now()-lastProg;
+  if((MQ.length&&idle>20000)||(/^(rolling|moving|skip)$/.test(phase)&&idle>30000)||(outAt&&Date.now()-outAt>6000))resyncNow('watchdog')},4000);
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){hiddenAt=Date.now();return}
+  if(!ONLINE)return;lastPongAt=Date.now();
+  if(started&&phase!=='over'&&hiddenAt&&Date.now()-hiddenAt>15000){hiddenAt=0;resyncNow('woke up')}   /* phone was asleep: rebuild instead of slowly catching up */
+  else if(!ws||ws.readyState>1){wsFails=0;openWS(pollGen)}});
+addEventListener('online',()=>{if(ONLINE&&(!ws||ws.readyState>1)){wsFails=0;openWS(pollGen)}});
 function updSkip(){const c=players[cur];
   $('#skip').classList.toggle('hide',!(ONLINE&&started&&me.host&&c&&onlineOn.length&&!onlineOn.includes(c)&&phase==='roll'))}
 $('#skip').onpointerdown=e=>{e.preventDefault();post({t:'skip'})};
@@ -849,7 +899,7 @@ if(/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&
 if(LITE==='1')setLite(true);else if(LITE==='0')setLite(false);
 else{setLite((navigator.hardwareConcurrency||8)<=4);   // slow phones: switch effects off automatically
   let fr=0;const t0=performance.now();(function f(){fr++;const dt=performance.now()-t0;if(dt<1500)requestAnimationFrame(f);else if(fr/(dt/1000)<40)setLite(true)})()}
-function leaveOnline(){pollGen++;if(ws){try{ws.close()}catch(e){}}ws=null;selfMoves=0;if(es)es.close();es=null;ONLINE=false;FAST=false;names={};started=false;onlineOn=[];lobbySeats={};try{localStorage.removeItem('ludoSess')}catch(e){}}
+function leaveOnline(){pollGen++;if(ws){try{ws.close()}catch(e){}}ws=null;selfMoves=selfRolls=0;outAt=0;ONLINE=false;FAST=false;names={};started=false;onlineOn=[];lobbySeats={};try{localStorage.removeItem('ludoSess')}catch(e){}$('#sync').classList.add('hide')}
 $('#again').addEventListener('click',()=>{leaveOnline();$('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide')});
 function askServer(){const v=prompt('Enter your game server address, e.g. https://your-name.onrender.com');if(!v)return false;
   const b=normBase(v);if(!b){alert('That address does not look right');return false}BASE=b;try{localStorage.setItem('ludoServer',BASE)}catch(e){}return true}
@@ -997,10 +1047,20 @@ class Room:
         self._saved = (-1, "")      # (rev, json text) of the last save of this room
         self.conns = {}             # client id -> [Queue, ...] (open WebSockets)
         self.left = set()           # colours that quit mid-game
+        self.last_resync = 0        # time of the last "Sync" (limits how often it can happen)
+        self.chk = {}               # log position -> {colour: fingerprint of that phone's game}
         self.seen = {}              # client id -> last long-poll time
         self.touch = time.time()
         self.lock = threading.RLock()
         self.cond = threading.Condition(self.lock)
+
+    def request_resync(self, color):
+        """Ask every phone to rebuild from the log (at most once every 3 seconds)."""
+        now = time.time()
+        if now - self.last_resync > 3:
+            self.last_resync = now
+            self.chk.clear()
+            self.append({"t": "resync", "c": color})
 
     def is_active(self, now=None):
         now = now or time.time()
@@ -1345,6 +1405,17 @@ def api_send(d):
             i = msg.get("i")
             if isinstance(i, int) and 0 <= i < 4:
                 r.append({"t": "move", "c": color, "i": i})
+        elif t == "resync":                                      # the Sync button: every phone rebuilds from the log
+            r.request_resync(color)
+        elif t == "chk":                                         # fingerprint of a phone's game at log position n
+            n, h = msg.get("n"), msg.get("h")
+            if isinstance(n, int) and isinstance(h, str) and len(h) <= 12:
+                book = r.chk.setdefault(n, {})
+                book[color] = h
+                for old in sorted(r.chk)[:-10]:                  # keep only the latest positions
+                    del r.chk[old]
+                if len(set(book.values())) > 1:                  # two phones disagree about the same moment: everybody rebuilds
+                    r.request_resync("?")
         elif t in ("skip", "finish") and cid == r.host:
             r.append({"t": t})
     return {"ok": True}
@@ -1580,6 +1651,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 alive.clear()
 
         threading.Thread(target=writer, daemon=True).start()
+        tokens, stamp = 30.0, time.time()
         try:
             while alive.is_set():
                 op, payload = self.ws_read()
@@ -1595,6 +1667,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     if isinstance(msg, dict) and msg.get("t") == "ping":     # latency meter: answer at once, never queued
                         send(1, '{"t":"pong","ts":%s}' % json.dumps(msg.get("ts")))
                         continue
+                    now = time.time()                                       # flood guard: ~10 messages/s, bursts up to 30
+                    tokens = min(30.0, tokens + (now - stamp) * 10)
+                    stamp = now
+                    if tokens < 1:
+                        continue
+                    tokens -= 1
                     api_send({"room": r.code, "id": cid, "msg": msg})
         except (OSError, ValueError):
             pass

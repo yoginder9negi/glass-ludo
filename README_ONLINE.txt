@@ -71,3 +71,7 @@ MAKE THE WEB VERSION AVAILABLE TO MULTIPLAYER (anyone, any phone/PC browser - no
 FUN EFFECTS: when a goti is cut, the killer turns into a cartoon hammer that smashes the victim while a cartoon dhol player
  plays a Punjabi dhol and shouts "Wo maara!". When a goti reaches home, a wedding shehnai plays and a cute girl pushes
  the lota (griha pravesh). Voices use the phone's text-to-speech (Hindi voice is used if installed).
+
+GAME FROZE ("X is playing..." and nothing moves)?  Press the 🔄 Sync button (top-left, online games). Every phone rebuilds the game
+from the server's log and everyone continues from the same point. The game also heals itself: it detects lost messages, dead
+connections, phones waking up from sleep, and phones that disagree about the game, and re-syncs automatically.
