@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GLASS LUDO v3.2 - web based, pure Python (no installs needed).
+GLASS LUDO v3.3 - web based, pure Python (no installs needed).
 Run:  python ludo.py
  - Computer: http://localhost:8000
  - Mobile  : open the "On your mobile" link printed in the terminal (same Wi-Fi)
@@ -10,12 +10,10 @@ Rules
  * Roll 6 to bring a token out. 6 / cutting a goti / reaching home = extra turn.
  * 3 sixes in a row = turn lost, all tokens go back to where they were.
  * First to bring all tokens home is 1st; play continues for 2nd, 3rd ... until one player is left.
- * Two players left, one of them has not cut anybody (so can never enter home) and the other has all gotis in its home lane:
-   the other one's gotis walk home by themselves, no dice needed.
  * Three sixes in a row: a big thumbs-down 👎 falls on the player's start square.
  * Online freeze? Press 🔄 Sync: every phone rebuilds the game from the server's log and resumes from the same point.
- * A token can NOT enter home until its player has cut at least one opponent
-   token. Until then it skips the home lane and keeps circling the board.
+ * Home lane: a token enters it when its player has cut at least one opponent token. If nobody has been cut yet,
+   the token skips the lane the first time it passes and goes round the board once more; on the next round it may enter.
  * Exact number needed to reach the final home.
 
 File layout
@@ -652,12 +650,11 @@ function crackers(ms){const cv=document.createElement('canvas'),lite=document.bo
 function celebrate(){try{crackers(CLIP_MS-1200)}catch(e){}playClip('win')}
 function yardNames(){COLORS.forEach(c=>{const e=yardNm[c];if(!e)return;const on=players.includes(c),k=finished.indexOf(c),n=on?[...pn(c)].slice(0,3).join('').toUpperCase():'';   /* player name (diagonal, embossed) in own start box + finishing place */
   e.a.textContent=n;e.a.setAttribute('data-t',n);e.b.textContent=on&&k>=0?PLACE[k]:'';e.box.style.opacity=on&&leftSet.has(c)?.5:1})}
-const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 cut a goti to open home';
+const lockTxt=c=>killed[c]?'⚔️ home open':'🔒 no cut yet: home on the next round';
 function say(t){const c=players[cur];$('#st').innerHTML=`<div><b style="background:${HEX[c]}">${pn(c)}</b> ${t}<br><small>${lockTxt(c)}</small></div>`}
 function shade(h,f){const n=parseInt(h.slice(1),16);return '#'+[16,8,0].map(k=>Math.round(((n>>k)&255)*f).toString(16).padStart(2,'0')).join('')}
 function startTurn(){if(phase==='over')return;markProg();
   if(isOut(players[cur])){phase='skip';busy=true;const g=gen;sleep(250).then(()=>{if(g===gen&&phase==='skip'){busy=false;nextTurn()}});return}
-  {const W=lockedWinner();if(W){autoHome(W);return}}
   phase='roll';busy=false;const c=players[cur];if(!ONLINE)saveLocal();
   $('#scene').style.setProperty('--pc',HEX[c]);$('#scene').style.setProperty('--pd',shade(HEX[c],.55));
   const mine=!ONLINE||c===me.color;
@@ -680,7 +677,7 @@ $('#board').addEventListener('pointerdown',e=>{if(phase!=='move')return;const c=
 
 /* move simulation: returns list of positions the token will pass, or null if illegal */
 function stepsList(c,p,r){if(p<0)return r===6?[0]:null;const out=[];
-  for(let s=0;s<r;s++){if(p>=HB){if(p>=FIN_P)return null;p++}else p=(p%R===LAST&&killed[c])?HB:p+1;out.push(p)}return out}
+  for(let s=0;s<r;s++){if(p>=HB){if(p>=FIN_P)return null;p++}else p=(p%R===LAST&&(killed[c]||p>=R))?HB:p+1;out.push(p)}return out}   /* at the home turn: enter if the player has cut somebody, or if this token is already on its second round (p>=R) */
 const movable=c=>[0,1,2,3].filter(i=>stepsList(c,T[c][i],roll)!==null);
 function victims(c,np){if(np<0||np>=HB)return[];const a=(START[c]+np)%R;if(SAFE.has(a))return[];const v=[];
   players.forEach(o=>{if(o!==c)T[o].forEach((p,j)=>{if(p>=0&&p<HB&&(START[o]+p)%R===a)v.push([o,j])})});return v}
@@ -721,7 +718,7 @@ async function doMove(c,i){if(busy||phase!=='move')return;const list=stepsList(c
   let warned=false;
   const fromYard=T[c][i]<0,willKill=victims(c,list[list.length-1]).length>0,trail=[coord(c,i,T[c][i])];
   for(const np of list){const prev=T[c][i];
-    if(prev>=0&&prev<HB&&prev%R===LAST&&!killed[c]&&!warned){warned=true;toast('🔒 Cut a goti first!')}
+    if(prev>=0&&prev<R&&prev%R===LAST&&!killed[c]&&!warned){warned=true;toast('🔒 No cut yet – one more round, then home!')}
     T[c][i]=np;
     if(willKill){trail.push(coord(c,i,np));continue}        /* a killing move: the hammer itself hops over these squares */
     place();sfxTick();if(fromYard)showDholBoy(c);await sleep(150);if(g!==gen)return}
@@ -737,17 +734,6 @@ async function doMove(c,i){if(busy||phase!=='move')return;const list=stepsList(c
     toast('🏅 '+pn(c)+' finished #'+finished.length);burst(tokEl[c][i],50);await sleep(900);if(g!==gen)return;nextTurn();return}
   if(extra)startTurn();else nextTurn()}
 
-/* ---- decided game: two players left, A has not cut anybody (so can never enter home) and B has every goti inside its home lane
-   (lane tokens cannot be cut). Nothing can change any more, so B's gotis walk into home by themselves - no dice. ---- */
-function lockedWinner(){const act=players.filter(c=>!isOut(c));if(act.length!==2)return null;
-  for(const B of act){const A=act[0]===B?act[1]:act[0];if(!killed[A]&&T[B].every(p=>p>=HB))return B}
-  return null}
-async function autoHome(B){
-  const g=gen,A=players.find(c=>c!==B&&!isOut(c));phase='auto';busy=true;markProg();
-  toast('🏠 '+pn(A)+' can never enter home – '+pn(B)+' goes home automatically');
-  for(let i=0;i<4;i++){while(T[B][i]<FIN_P){T[B][i]++;place();sfxTick();await sleep(130);if(g!==gen)return}await sleep(120);if(g!==gen)return}
-  sfxShehnai();showToon('toonR',3500);burst(tokEl[B][0],40);await sleep(600);if(g!==gen)return;
-  finished.push(B);yardNames();if(finished.length===1&&!FAST)celebrate();endGame(B)}
 function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');$('#quit').classList.add('hide');$('#sync').classList.add('hide');
   const fo=c=>{const k=finished.indexOf(c);return k<0?99:k},prog=c=>T[c].reduce((a,x)=>a+(x<0?0:x<HB?x:LAST+1+(x-HB)),0);
   const rows=players.map(c=>({c,h:T[c].filter(x=>x===FIN_P).length,p:prog(c)})).sort((a,b)=>fo(a.c)-fo(b.c)||b.h-a.h||b.p-a.p);
@@ -902,7 +888,7 @@ $('#sync').onclick=()=>{if(!ONLINE||!started||phase==='over')return;
 setInterval(()=>{   /* watchdog: if the game is stuck, heal it without anyone pressing anything */
   if(!ONLINE||!started||phase==='over'||document.hidden||Date.now()-lastResync<10000)return;
   const idle=Date.now()-lastProg;
-  if((MQ.length&&idle>20000)||(/^(rolling|moving|skip|auto)$/.test(phase)&&idle>30000)||(outAt&&Date.now()-outAt>6000))resyncNow('watchdog')},4000);
+  if((MQ.length&&idle>20000)||(/^(rolling|moving|skip)$/.test(phase)&&idle>30000)||(outAt&&Date.now()-outAt>6000))resyncNow('watchdog')},4000);
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){hiddenAt=Date.now();return}
   if(!ONLINE)return;lastPongAt=Date.now();

@@ -81,5 +81,7 @@ SLOW / LATE MOVES: the ping badge (bottom-right) is the round trip to your serve
  (India: a VPS in Mumbai/Bangalore, Oracle Cloud free tier Mumbai, Fly.io 'bom', AWS/Google Mumbai), (2) Render region Singapore at least,
  (3) Wi-Fi or strong 4G/5G, no VPN/data saver, (4) an always-on server (free Render sleeps when idle).
 
-EXTRA RULES: two players left, one never cut anybody and the other has all gotis in its home lane -> the other one walks home
- automatically. Three sixes in a row -> a big thumbs-down falls on the player's start square.
+
+HOME-LANE RULE: a token enters its home lane once its player has cut at least one opponent token. If nobody has been cut yet, the token
+ skips the lane the first time it passes and goes round the board once more; on the next round it can enter. (No automatic walking home.)
+THREE SIXES in a row: turn lost, tokens go back, and a big thumbs-down 👎 falls on the player's start square.
