@@ -72,9 +72,6 @@ FUN EFFECTS: when a goti is cut, the killer turns into a cartoon hammer that sma
  plays a Punjabi dhol and shouts "Wo maara!". When a goti reaches home, a wedding shehnai plays and a cute girl pushes
  the lota (griha pravesh). Voices use the phone's text-to-speech (Hindi voice is used if installed).
 
-GAME FROZE ("X is playing..." and nothing moves)?  Press the 🔄 Sync button (top-left, online games). Every phone rebuilds the game
-from the server's log and everyone continues from the same point. The game also heals itself: it detects lost messages, dead
-connections, phones waking up from sleep, and phones that disagree about the game, and re-syncs automatically.
 
 SLOW / LATE MOVES: the ping badge (bottom-right) is the round trip to your server. Under 150 ms feels instant.
  A high number (e.g. 400 ms) is distance or a weak connection, not the game. Fix it by: (1) hosting in or near your country
@@ -85,3 +82,10 @@ SLOW / LATE MOVES: the ping badge (bottom-right) is the round trip to your serve
 HOME-LANE RULE: a token enters its home lane once its player has cut at least one opponent token. If nobody has been cut yet, the token
  skips the lane the first time it passes and goes round the board once more; on the next round it can enter. (No automatic walking home.)
 THREE SIXES in a row: turn lost, tokens go back, and a big thumbs-down 👎 falls on the player's start square.
+
+GAME FROZE, or ONE PLAYER CANNOT ROLL THE DICE? Three levels of repair, from light to strong:
+ 1. The game heals itself: it detects lost messages, dead connections, phones waking up, phones that disagree, and re-syncs (no action needed).
+ 2. Press 🔄 Sync (top-left): every phone rebuilds the game from the server's log and resumes at the same point.
+ 3. Still stuck? Press 🔄 Sync AGAIN within a minute: every phone fully reloads and rejoins its own seat, then resumes at the same point.
+    A single phone can also do this alone: tap the dice 3 times in a row (re-sync), and again (full reload).
+ A phone that does not come back within 12 s after a re-sync reloads itself automatically.

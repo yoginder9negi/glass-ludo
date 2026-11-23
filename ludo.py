@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GLASS LUDO v3.3 - web based, pure Python (no installs needed).
+GLASS LUDO v3.4 - web based, pure Python (no installs needed).
 Run:  python ludo.py
  - Computer: http://localhost:8000
  - Mobile  : open the "On your mobile" link printed in the terminal (same Wi-Fi)
@@ -554,7 +554,7 @@ function burst(el,n=36,cols=Object.values(HEX)){if(FAST)return;n=Math.min(n,28);
 let mode={red:'human',green:'off',yellow:'cpu',blue:'off'},players=[],T={},killed={},cur=0,roll=0,phase='idle',busy=false,gen=0,sixCount=0,snap=null;
 let gameT0=0,statDone=false,gameNames={},finished=[];
 let leftSet=new Set(),ONLINE=false,me={},names={},lastN=0,sentRoll=false,sentMove=false,onlineOn=[],started=false,lobbySeats={},lobbyHost='',BASE='',pollGen=0,synced=false,WINN=4,ws=null,spinning=false,selfMoves=0,
-  qgen=0,appliedN=0,lastBeacon='',polling=false,lastProg=Date.now(),lastResync=0,outAt=0,lastPongAt=0,hiddenAt=0;   /* qgen: current queue worker; outAt: when my oldest unconfirmed action was sent */
+  qgen=0,appliedN=0,lastBeacon='',pollingGen=0,gameLive=false,lastReady=Date.now(),lastSyncPress=0,blockedTaps=[],lastProg=Date.now(),lastResync=0,outAt=0,lastPongAt=0,hiddenAt=0;   /* qgen: current queue worker; outAt: when my oldest unconfirmed action was sent */
 function normBase(v){v=(v||'').trim();if(!v)return'';try{return new URL(/^https?:\/\//i.test(v)?v:((/^(\d+\.\d+\.\d+\.\d+|localhost)/.test(v)?'http://':'https://')+v)).origin}catch(e){return''}}
 if(location.protocol==='file:'){try{BASE=normBase(localStorage.getItem('ludoServer'))}catch(e){}}
 const tokEl={};
@@ -665,7 +665,8 @@ let nextRoll=0,selfRolls=0;const predicted=[];   /* nextRoll: the server told me
 function tapDice(){
   if(ONLINE){if(ready()&&phase==='roll'&&!busy&&players[cur]===me.color&&!sentRoll){sentRoll=true;
     if(nextRoll>=1&&nextRoll<=6){const v=nextRoll;nextRoll=0;selfRolls++;predicted.push(v);outAt=outAt||Date.now();setTimeout(()=>{sentRoll=false},6000);post({t:'roll'});rollDice(v)}   /* dice starts at once; the server's echo only confirms it */
-    else{startSpin();setTimeout(()=>{sentRoll=false;if(spinning)stopSpin()},6000);post({t:'roll'})}}return}
+    else{startSpin();setTimeout(()=>{sentRoll=false;if(spinning)stopSpin()},6000);post({t:'roll'})}}
+    else if(!sentRoll)stuckTap();return}
   if(phase==='roll'&&mode[players[cur]]==='human')rollDice()}
 $('#scene').onpointerdown=e=>{e.preventDefault();A();tapDice()};
 
@@ -734,7 +735,7 @@ async function doMove(c,i){if(busy||phase!=='move')return;const list=stepsList(c
     toast('🏅 '+pn(c)+' finished #'+finished.length);burst(tokEl[c][i],50);await sleep(900);if(g!==gen)return;nextTurn();return}
   if(extra)startTurn();else nextTurn()}
 
-function endGame(w0){phase='over';busy=true;gen++;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');$('#quit').classList.add('hide');$('#sync').classList.add('hide');
+function endGame(w0){phase='over';busy=true;gen++;gameLive=false;clearLocal();try{localStorage.removeItem('ludoSess')}catch(e){}$('#fin').classList.add('hide');$('#quit').classList.add('hide');$('#sync').classList.add('hide');
   const fo=c=>{const k=finished.indexOf(c);return k<0?99:k},prog=c=>T[c].reduce((a,x)=>a+(x<0?0:x<HB?x:LAST+1+(x-HB)),0);
   const rows=players.map(c=>({c,h:T[c].filter(x=>x===FIN_P).length,p:prog(c)})).sort((a,b)=>fo(a.c)-fo(b.c)||b.h-a.h||b.p-a.p);
   if(w0&&!finished.length){const wi=rows.findIndex(r=>r.c===w0);if(wi>0)rows.unshift(rows.splice(wi,1)[0])}
@@ -799,7 +800,7 @@ async function pingLoop(g){
     catch(x){const e=$('#net');e.classList.remove('hide');e.textContent='🔴 offline'}
     await rs(10000)}
   $('#net').classList.add('hide')}
-function startPoll(g){if(polling)return;polling=true;pollLoop(g).finally(()=>{polling=false})}
+function startPoll(g){if(pollingGen===g)return;pollingGen=g;pollLoop(g)}   /* one poller per connection generation: an old poller still waiting must not block the new one */
 async function pollLoop(g){let fails=0;
   while(g===pollGen&&ONLINE&&!(ws&&ws.readyState===1)){
     try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),32000);
@@ -816,9 +817,9 @@ function handle(d){
   else if(d.t==='presence'){onlineOn=d.on;renderSeats();updSkip()}
   else if(d.t==='synced'){synced=true;if(!qrun&&!MQ.length)FAST=false}
   else if(d.t==='closed'){leaveOnline();onErr('The host closed this room.');$('#win').classList.add('hide');$('#online').classList.remove('hide');$('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide')}
-  else if(d.t==='start'){appliedN=d.n||0;selfMoves=selfRolls=0;predicted.length=0;outAt=0;WINN=d.win||4;players=d.players;mode={red:'off',green:'off',yellow:'off',blue:'off'};players.forEach(c=>mode[c]='human');started=true;
+  else if(d.t==='start'){gameLive=true;appliedN=d.n||0;selfMoves=selfRolls=0;predicted.length=0;outAt=0;WINN=d.win||4;players=d.players;mode={red:'off',green:'off',yellow:'off',blue:'off'};players.forEach(c=>mode[c]='human');started=true;
     MQ.length=0;$('#online').classList.add('hide');$('#setup').classList.add('hide');$('#win').classList.add('hide');newGame()}
-  else if(d.t==='resync'){if(!FAST&&synced&&Date.now()-lastResync>8000)resyncNow('requested by '+pn(d.c))}   /* someone pressed Sync (ignored while replaying, and by the phone that pressed it) */
+  else if(d.t==='resync'){if(!FAST&&synced&&(d.hard||Date.now()-lastResync>8000)){if(d.hard)hardRejoin();else resyncNow('requested by '+pn(d.c))}}   /* someone pressed Sync (ignored while replaying, and by the phone that pressed it) */
   else if(d.t==='roll'||d.t==='move'||d.t==='skip'||d.t==='finish'||d.t==='left'){MQ.push(d);if(!qrun)runQ()}}
 function renderPick(){const b=$('#pick');b.innerHTML='';['red','green','blue','yellow'].forEach(c=>{const x=document.createElement('button');
   const taken=!!lobbySeats[c]&&c!==me.color;x.style.cssText=`background:${HEX[c]};border:3px solid ${c===me.color?'#fff':'transparent'};border-radius:14px;opacity:${taken?.25:1}`;
@@ -866,14 +867,27 @@ async function applyMsg(m,my){   /* my = which queue worker called us; after a S
 
 /* ---- self-healing: rebuild this phone from the server's log. Every phone replays the same log, so all end up identical ---- */
 function resyncNow(why){
-  if(!ONLINE||!started)return;
-  lastResync=Date.now();console.log('resync:',why);toast('🔄 Syncing…');
+  if(!ONLINE||!gameLive)return;
+  lastResync=Date.now();lastProg=Date.now();console.log('resync:',why);toast('🔄 Syncing…');
   qgen++;qrun=false;MQ.length=0;gen++;                       /* the old queue worker and any animation in flight stop */
   selfMoves=selfRolls=0;predicted.length=0;nextRoll=0;sentRoll=sentMove=false;outAt=0;if(spinning)stopSpin();
   lastN=0;appliedN=0;lastBeacon='';started=false;phase='idle';busy=true;leftSet.clear();finished=[];
   Object.values(tokEl).flat().forEach(e=>e.remove());clearDholBoys();
   if(ws){const w=ws;ws=null;try{w.close()}catch(e){}}
-  connect()}                                                 /* reconnect from message 0: the server replays everything fast, then we are live again */
+  connect();                                                 /* reconnect from message 0: the server replays everything fast, then we are live again */
+  const t0=lastResync;setTimeout(()=>{if(ONLINE&&gameLive&&lastResync===t0&&!(started&&synced&&!FAST))hardRejoin()},12000)}   /* still not back after 12 s: full reload */
+/* last resort: reload the page and re-enter the same seat. Fresh start for the browser (queue, timers, connection); the server replays the game */
+function hardRejoin(){
+  if(!ONLINE||!me.room)return;
+  let last=0;try{last=+sessionStorage.getItem('hardAt')||0}catch(e){}
+  if(Date.now()-last<20000)return;                           /* never reload in a loop */
+  try{sessionStorage.setItem('hardAt',String(Date.now()));sessionStorage.setItem('autoResume','1')}catch(e){}
+  const t=$('#toast');t.textContent='♻ Rejoining the game…';t.classList.remove('show');void t.offsetWidth;t.classList.add('show');
+  setTimeout(()=>location.reload(),350)}
+/* a dice that does not react: 3 taps in 5 s = re-sync; again within 30 s = full reload */
+function stuckTap(){const now=Date.now();blockedTaps=blockedTaps.filter(t=>now-t<5000);blockedTaps.push(now);
+  if(blockedTaps.length<3)return;blockedTaps=[];
+  if(now-lastResync<30000)hardRejoin();else resyncNow('dice does not respond')}
 /* ---- safety net: at every turn boundary each phone sends a short fingerprint of its game. If two phones disagree about the same point
    in the game, the server asks everybody to rebuild from the log - so a silent difference can never turn into a freeze ---- */
 function stateHash(){const o=JSON.stringify([players.map(c=>T[c]),cur,finished,players.map(c=>!!killed[c]),[...leftSet].sort()]);
@@ -882,17 +896,21 @@ function beacon(){if(!ONLINE||!started||phase!=='roll'||busy||qrun||!ready()||se
   const h=stateHash(),k=appliedN+':'+h;if(k===lastBeacon)return;lastBeacon=k;
   try{ws.send(JSON.stringify({t:'chk',n:appliedN,h}))}catch(e){}}
 setInterval(beacon,3000);
-$('#sync').onclick=()=>{if(!ONLINE||!started||phase==='over')return;
-  if(!confirm('Refresh the game for ALL players? Everyone continues from the same point.'))return;
-  post({t:'resync'});resyncNow('button')};
+$('#sync').onclick=()=>{if(!ONLINE||!gameLive||phase==='over')return;
+  const again=Date.now()-lastSyncPress<60000;lastSyncPress=Date.now();
+  if(!confirm(again?'Still stuck? Fully reload the game for ALL players? Everybody rejoins at the same point.':'Refresh the game for ALL players? Everybody continues from the same point.'))return;
+  if(again){post({t:'resync',hard:true});setTimeout(hardRejoin,400)}   /* second press within a minute: full reload for everybody */
+  else{post({t:'resync'});resyncNow('button')}};
 setInterval(()=>{   /* watchdog: if the game is stuck, heal it without anyone pressing anything */
-  if(!ONLINE||!started||phase==='over'||document.hidden||Date.now()-lastResync<10000)return;
+  if(!ONLINE||!gameLive||phase==='over'||document.hidden)return;
+  if(ready())lastReady=Date.now();
+  if(Date.now()-lastResync<10000)return;
   const idle=Date.now()-lastProg;
-  if((MQ.length&&idle>20000)||(/^(rolling|moving|skip)$/.test(phase)&&idle>30000)||(outAt&&Date.now()-outAt>6000))resyncNow('watchdog')},4000);
+  if((MQ.length&&idle>20000)||(/^(rolling|moving|skip)$/.test(phase)&&idle>30000)||(outAt&&Date.now()-outAt>6000)||Date.now()-lastReady>15000||(!started&&idle>15000))resyncNow('watchdog')},4000);
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){hiddenAt=Date.now();return}
   if(!ONLINE)return;lastPongAt=Date.now();
-  if(started&&phase!=='over'&&hiddenAt&&Date.now()-hiddenAt>15000){hiddenAt=0;resyncNow('woke up')}   /* phone was asleep: rebuild instead of slowly catching up */
+  if(gameLive&&phase!=='over'&&hiddenAt&&Date.now()-hiddenAt>15000){hiddenAt=0;resyncNow('woke up')}   /* phone was asleep: rebuild instead of slowly catching up */
   else if(!ws||ws.readyState>1){wsFails=0;openWS(pollGen)}});
 addEventListener('online',()=>{if(ONLINE&&(!ws||ws.readyState>1)){wsFails=0;openWS(pollGen)}});
 function updSkip(){const c=players[cur];
@@ -910,7 +928,7 @@ if(/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&
 if(LITE==='1')setLite(true);else if(LITE==='0')setLite(false);
 else{setLite((navigator.hardwareConcurrency||8)<=4);   // slow phones: switch effects off automatically
   let fr=0;const t0=performance.now();(function f(){fr++;const dt=performance.now()-t0;if(dt<1500)requestAnimationFrame(f);else if(fr/(dt/1000)<40)setLite(true)})()}
-function leaveOnline(){pollGen++;if(ws){try{ws.close()}catch(e){}}ws=null;selfMoves=selfRolls=0;outAt=0;ONLINE=false;FAST=false;names={};started=false;onlineOn=[];lobbySeats={};try{localStorage.removeItem('ludoSess')}catch(e){}$('#sync').classList.add('hide')}
+function leaveOnline(){gameLive=false;pollGen++;if(ws){try{ws.close()}catch(e){}}ws=null;selfMoves=selfRolls=0;outAt=0;ONLINE=false;FAST=false;names={};started=false;onlineOn=[];lobbySeats={};try{localStorage.removeItem('ludoSess')}catch(e){}$('#sync').classList.add('hide')}
 $('#again').addEventListener('click',()=>{leaveOnline();$('#onJoin').classList.remove('hide');$('#onLobby').classList.add('hide')});
 function askServer(){const v=prompt('Enter your game server address, e.g. https://your-name.onrender.com');if(!v)return false;
   const b=normBase(v);if(!b){alert('That address does not look right');return false}BASE=b;try{localStorage.setItem('ludoServer',BASE)}catch(e){}return true}
@@ -1059,19 +1077,28 @@ class Room:
         self.conns = {}             # client id -> [Queue, ...] (open WebSockets)
         self.left = set()           # colours that quit mid-game
         self.last_resync = 0        # time of the last "Sync" (limits how often it can happen)
+        self.last_hard = 0          # time of the last full-reload request
         self.chk = {}               # log position -> {colour: fingerprint of that phone's game}
         self.seen = {}              # client id -> last long-poll time
         self.touch = time.time()
         self.lock = threading.RLock()
         self.cond = threading.Condition(self.lock)
 
-    def request_resync(self, color):
-        """Ask every phone to rebuild from the log (at most once every 3 seconds)."""
+    def request_resync(self, color, hard=False):
+        """Ask every phone to rebuild from the log (at most once every 3 seconds). hard=True: reload the page, then rebuild."""
         now = time.time()
-        if now - self.last_resync > 3:
-            self.last_resync = now
-            self.chk.clear()
-            self.append({"t": "resync", "c": color})
+        if hard:                                            # a full reload is never swallowed by the 3-second limit of a normal Sync
+            if now - self.last_hard <= 3:
+                return
+            self.last_hard = now
+        elif now - self.last_resync <= 3:
+            return
+        self.last_resync = now
+        self.chk.clear()
+        msg = {"t": "resync", "c": color}
+        if hard:
+            msg["hard"] = True
+        self.append(msg)
 
     def is_active(self, now=None):
         now = now or time.time()
@@ -1417,7 +1444,7 @@ def api_send(d):
             if isinstance(i, int) and 0 <= i < 4:
                 r.append({"t": "move", "c": color, "i": i})
         elif t == "resync":                                      # the Sync button: every phone rebuilds from the log
-            r.request_resync(color)
+            r.request_resync(color, bool(msg.get("hard")))
         elif t == "chk":                                         # fingerprint of a phone's game at log position n
             n, h = msg.get("n"), msg.get("h")
             if isinstance(n, int) and isinstance(h, str) and len(h) <= 12:
